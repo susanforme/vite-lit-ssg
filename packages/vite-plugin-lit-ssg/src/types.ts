@@ -101,3 +101,7 @@ export interface ManifestEntry {
  * Shape of the full Vite `manifest.json`.
  */
 export type ViteManifest = Record<string, ManifestEntry>
+
+export interface LitSSGOptionsNew {
+  pagesDir?: string
+}
