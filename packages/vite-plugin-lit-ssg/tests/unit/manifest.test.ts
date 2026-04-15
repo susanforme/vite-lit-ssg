@@ -15,29 +15,27 @@ const sampleManifest: ViteManifest = {
 }
 
 describe('resolveAssetsFromManifest', () => {
-  it('resolves main js, css, and modulepreloads', () => {
-    const assets = resolveAssetsFromManifest(sampleManifest, '/src/entry-client.ts', '/')
+  it('resolves main js, css, and modulepreloads via isEntry scan', () => {
+    const assets = resolveAssetsFromManifest(sampleManifest, '/')
     expect(assets.js).toBe('/assets/entry-client-abc123.js')
     expect(assets.css).toEqual(['/assets/style-def456.css'])
     expect(assets.modulepreloads).toEqual(['/assets/shared-ghi789.js'])
   })
 
   it('handles custom base path', () => {
-    const assets = resolveAssetsFromManifest(sampleManifest, '/src/entry-client.ts', '/docs/')
+    const assets = resolveAssetsFromManifest(sampleManifest, '/docs/')
     expect(assets.js).toBe('/docs/assets/entry-client-abc123.js')
     expect(assets.css).toEqual(['/docs/assets/style-def456.css'])
     expect(assets.modulepreloads).toEqual(['/docs/assets/shared-ghi789.js'])
   })
 
-  it('throws when entry is not found', () => {
-    expect(() =>
-      resolveAssetsFromManifest(sampleManifest, '/src/missing.ts', '/'),
-    ).toThrow(/Could not find entry/)
-  })
-
-  it('handles entry without leading slash', () => {
-    const assets = resolveAssetsFromManifest(sampleManifest, 'src/entry-client.ts', '/')
-    expect(assets.js).toBe('/assets/entry-client-abc123.js')
+  it('throws when no isEntry item found', () => {
+    const noEntryManifest: ViteManifest = {
+      'src/some-chunk.ts': {
+        file: 'assets/some-chunk.js',
+      },
+    }
+    expect(() => resolveAssetsFromManifest(noEntryManifest, '/')).toThrow(/No isEntry item found/)
   })
 
   it('returns empty css and preloads when none in manifest', () => {
@@ -47,7 +45,7 @@ describe('resolveAssetsFromManifest', () => {
         isEntry: true,
       },
     }
-    const assets = resolveAssetsFromManifest(minimal, '/src/entry-client.ts', '/')
+    const assets = resolveAssetsFromManifest(minimal, '/')
     expect(assets.css).toEqual([])
     expect(assets.modulepreloads).toEqual([])
   })
@@ -70,7 +68,7 @@ describe('resolveAssetsFromManifest', () => {
         css: ['assets/chunk-b.css'],
       },
     }
-    const assets = resolveAssetsFromManifest(manifest, '/src/entry-client.ts', '/')
+    const assets = resolveAssetsFromManifest(manifest, '/')
     expect(assets.css).toContain('/assets/entry.css')
     expect(assets.css).toContain('/assets/chunk-a.css')
     expect(assets.css).toContain('/assets/chunk-b.css')
@@ -92,32 +90,30 @@ describe('resolveAssetsFromManifest', () => {
         imports: ['_chunk-a.js'],
       },
     }
-    expect(() =>
-      resolveAssetsFromManifest(manifest, '/src/entry-client.ts', '/'),
-    ).not.toThrow()
+    expect(() => resolveAssetsFromManifest(manifest, '/')).not.toThrow()
   })
 
   it('uses relative paths for root route when base is "./"', () => {
-    const assets = resolveAssetsFromManifest(sampleManifest, '/src/entry-client.ts', './', 0)
+    const assets = resolveAssetsFromManifest(sampleManifest, './', 0)
     expect(assets.js).toBe('./assets/entry-client-abc123.js')
     expect(assets.css).toEqual(['./assets/style-def456.css'])
     expect(assets.modulepreloads).toEqual(['./assets/shared-ghi789.js'])
   })
 
   it('uses relative paths with depth adjustment for nested routes when base is "./"', () => {
-    const assets = resolveAssetsFromManifest(sampleManifest, '/src/entry-client.ts', './', 1)
+    const assets = resolveAssetsFromManifest(sampleManifest, './', 1)
     expect(assets.js).toBe('../assets/entry-client-abc123.js')
     expect(assets.css).toEqual(['../assets/style-def456.css'])
     expect(assets.modulepreloads).toEqual(['../assets/shared-ghi789.js'])
   })
 
   it('uses relative paths for empty base at depth 0', () => {
-    const assets = resolveAssetsFromManifest(sampleManifest, '/src/entry-client.ts', '', 0)
+    const assets = resolveAssetsFromManifest(sampleManifest, '', 0)
     expect(assets.js).toBe('./assets/entry-client-abc123.js')
   })
 
   it('uses relative paths with double depth for deeply nested routes', () => {
-    const assets = resolveAssetsFromManifest(sampleManifest, '/src/entry-client.ts', './', 2)
+    const assets = resolveAssetsFromManifest(sampleManifest, './', 2)
     expect(assets.js).toBe('../../assets/entry-client-abc123.js')
   })
 })

@@ -10,24 +10,29 @@ export async function readManifest(outDir: string): Promise<ViteManifest> {
 
 export function resolveAssetsFromManifest(
   manifest: ViteManifest,
-  entryClient: string,
   base: string,
   routeDepth: number = 0,
 ): AssetLinks {
-  const normalizedEntry = normalizeEntryKey(entryClient)
-  const entry = manifest[normalizedEntry]
+  const entryItems = Object.entries(manifest).filter(([, v]) => v.isEntry)
 
-  if (!entry) {
-    const keys = Object.keys(manifest).join(', ')
+  if (entryItems.length === 0) {
     throw new Error(
-      `[vite-plugin-lit-ssg] Could not find entry "${normalizedEntry}" in manifest. Available keys: ${keys}`,
+      '[vite-plugin-lit-ssg] No isEntry item found in manifest. Make sure the client build has an entry point.',
     )
   }
+
+  if (entryItems.length > 1) {
+    console.warn(
+      `[vite-plugin-lit-ssg] Multiple isEntry items found in manifest (${entryItems.length}). Using the first one.`,
+    )
+  }
+
+  const [entryKey, entry] = entryItems[0]!
 
   const isRelativeBase = isRelative(base)
 
   const js = formatHref(base, entry.file, isRelativeBase, routeDepth)
-  const css = collectCss(manifest, normalizedEntry, base, isRelativeBase, routeDepth)
+  const css = collectCss(manifest, entryKey, base, isRelativeBase, routeDepth)
   const modulepreloads = collectModulePreloads(manifest, entry.imports ?? [], base, isRelativeBase, routeDepth)
 
   return { js, css, modulepreloads }
