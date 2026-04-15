@@ -1,8 +1,9 @@
 import { LitElement, html, css } from 'lit'
 import { customElement } from 'lit/decorators.js'
+import { defineLitRoute } from 'vite-plugin-lit-ssg'
 
-@customElement('about-page')
-export class AboutPage extends LitElement {
+@customElement('home-page')
+export class HomePage extends LitElement {
   static styles = css`
     :host {
       display: block;
@@ -25,10 +26,6 @@ export class AboutPage extends LitElement {
     nav a:hover {
       text-decoration: underline;
     }
-
-    ul {
-      line-height: 1.8;
-    }
   `
 
   render() {
@@ -37,14 +34,15 @@ export class AboutPage extends LitElement {
         <a href="/">Home</a>
         <a href="/about">About</a>
       </nav>
-      <h1>About</h1>
-      <p>vite-plugin-lit-ssg is a Vite plugin for generating static sites with Lit.</p>
-      <ul>
-        <li>Build-time prerendering with Lit SSR</li>
-        <li>Automatic JS/CSS asset injection</li>
-        <li>Support for page-level title and meta tags</li>
-        <li>Deploy anywhere as static files</li>
-      </ul>
+      <h1>Welcome to vite-plugin-lit-ssg</h1>
+      <p>This page was statically generated using Lit SSR and Vite.</p>
+      <p>It supports LitElement with Shadow DOM, server-side rendering, and client-side hydration.</p>
     `
   }
 }
+
+export default defineLitRoute({
+  component: HomePage,
+  title: 'Home | vite-plugin-lit-ssg',
+  meta: [{ name: 'description', content: 'Lit SSG home page' }],
+})
