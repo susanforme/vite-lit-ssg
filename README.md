@@ -1,12 +1,15 @@
 # vite-plugin-lit-ssg
 
-A Vite plugin for generating static sites with [Lit](https://lit.dev). It renders a set of known routes to static HTML at build time using [Lit SSR](https://lit.dev/docs/ssr/overview/), then injects the Vite-built client JS/CSS into each page.
+A Vite plugin for generating static sites with [Lit](https://lit.dev). It renders routes to static HTML at build time using [Lit SSR](https://lit.dev/docs/ssr/overview/), then injects the Vite-built client JS/CSS into each page.
+
+Convention over configuration: drop your page files in `src/pages/` and run one command.
 
 ## Features
 
 - Build-time prerendering with Lit SSR (`@lit-labs/ssr`)
+- **Zero required configuration** — routes auto-discovered from `src/pages/`
+- Page-level metadata via `defineLitRoute()` — title, lang, meta tags, and more
 - Automatic JS/CSS asset injection from Vite's manifest
-- Page-level `title`, `lang`, `meta`, and custom `<head>` tags
 - Support for `LitElement` with Shadow DOM (Declarative Shadow DOM output)
 - Static output deployable to any static hosting platform
 - Single command (`vite-lit-ssg build`) does everything
@@ -29,13 +32,7 @@ import { defineConfig } from 'vite'
 import { litSSG } from 'vite-plugin-lit-ssg'
 
 export default defineConfig({
-  plugins: [
-    litSSG({
-      entryServer: '/src/entry-server.ts',
-      entryClient: '/src/entry-client.ts',
-      routes: ['/', '/about'],
-    }),
-  ],
+  plugins: [litSSG()], // zero configuration required
 })
 ```
 
@@ -49,41 +46,48 @@ export default defineConfig({
 }
 ```
 
-### 3. Create your server entry
+### 3. Create your page files
 
 ```ts
-// src/entry-server.ts
-import { html } from 'lit'
-import './pages/home-page.js'
-import './pages/about-page.js'
+// src/pages/index.ts
+import { LitElement, html } from 'lit'
+import { customElement } from 'lit/decorators.js'
+import { defineLitRoute } from 'vite-plugin-lit-ssg'
 
-export async function render(url, ctx) {
-  switch (url) {
-    case '/':
-      return {
-        template: html`<home-page></home-page>`,
-        title: 'Home',
-      }
-    case '/about':
-      return {
-        template: html`<about-page></about-page>`,
-        title: 'About',
-      }
-    default:
-      return null
+@customElement('home-page')
+export class HomePage extends LitElement {
+  render() {
+    return html`<h1>Welcome</h1>`
   }
 }
-```
 
-### 4. Create your client entry
+export default defineLitRoute({
+  component: HomePage,
+  title: 'Home | My Site',
+  meta: [{ name: 'description', content: 'My home page' }],
+})
+```
 
 ```ts
-// src/entry-client.ts
-import './pages/home-page.js'
-import './pages/about-page.js'
+// src/pages/about.ts
+import { LitElement, html } from 'lit'
+import { customElement } from 'lit/decorators.js'
+import { defineLitRoute } from 'vite-plugin-lit-ssg'
+
+@customElement('about-page')
+export class AboutPage extends LitElement {
+  render() {
+    return html`<h1>About</h1>`
+  }
+}
+
+export default defineLitRoute({
+  component: AboutPage,
+  title: 'About | My Site',
+})
 ```
 
-### 5. Build
+### 4. Build
 
 ```bash
 npm run build
@@ -93,76 +97,64 @@ This generates a `dist/` directory ready to deploy:
 
 ```
 dist/
-  index.html
+  index.html          ← from src/pages/index.ts
   about/
-    index.html
+    index.html        ← from src/pages/about.ts
   assets/
-    entry-client-[hash].js
+    [hash].js
 ```
+
+## Page File Convention
+
+Place `.ts` files in `src/pages/` (flat, no subdirectories):
+
+| File | Route |
+|---|---|
+| `src/pages/index.ts` | `/` |
+| `src/pages/about.ts` | `/about` |
+| `src/pages/Contact.ts` | `/Contact` |
+
+- Only `.ts` files are scanned (not `.js`, `.tsx`, etc.)
+- Filenames are used as-is (no case conversion)
+- No recursive scanning — only the top-level `src/pages/` directory
+
+## `defineLitRoute()` API
+
+Each page file must export a `defineLitRoute()` call as its default export:
+
+```ts
+import { defineLitRoute } from 'vite-plugin-lit-ssg'
+
+export default defineLitRoute({
+  component: MyComponent,   // required: your LitElement class
+  title?: string,           // <title> tag
+  lang?: string,            // <html lang="..."> (default: 'en')
+  meta?: Array<Record<string, string>>,  // <meta> tags
+  head?: string[],          // raw HTML strings appended to <head>
+  htmlAttrs?: Record<string, string>,    // extra <html> attributes
+  bodyAttrs?: Record<string, string>,    // extra <body> attributes
+})
+```
+
+The component class must use the `@customElement` decorator — the tag name is auto-resolved via `customElements.getName()`.
 
 ## Plugin Options
 
 ```ts
 litSSG({
-  entryServer: '/src/entry-server.ts', // required
-  entryClient: '/src/entry-client.ts', // required
-  routes: ['/', '/about'],             // required: string[] or async factory
-  outDir: 'dist',                      // optional, default: 'dist'
+  pagesDir?: string  // default: 'src/pages'
 })
 ```
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `entryServer` | `string` | — | Server entry path (relative to project root) |
-| `entryClient` | `string` | — | Client entry path (relative to project root) |
-| `routes` | `string[] \| () => Promise<string[]>` | — | Routes to prerender |
-| `outDir` | `string` | `'dist'` | Output directory |
-
-## Render Function Contract
-
-Your `entry-server.ts` must export a `render(url, ctx)` function:
-
-```ts
-import type { PageRenderResult, RenderContext } from 'vite-plugin-lit-ssg'
-
-export async function render(url: string, ctx: RenderContext): Promise<PageRenderResult>
-```
-
-The return value can be:
-
-```ts
-type PageRenderResult =
-  | null                // skip this route (404)
-  | TemplateResult      // simple template (no page metadata)
-  | {
-      template: TemplateResult
-      title?: string
-      lang?: string                          // default: 'en'
-      meta?: Array<Record<string, string>>   // typed <meta> tags
-      head?: string[]                        // raw HTML strings for <head>
-      htmlAttrs?: Record<string, string>
-      bodyAttrs?: Record<string, string>
-    }
-```
-
-## Dynamic Routes
-
-Pass an async factory instead of a static array:
-
-```ts
-litSSG({
-  routes: async () => {
-    const posts = await fetchPosts()
-    return ['/', '/about', ...posts.map(p => `/blog/${p.slug}`)]
-  },
-})
-```
+| `pagesDir` | `string` | `'src/pages'` | Directory to scan for page files |
 
 ## How It Works
 
-1. **Client build** — Vite builds client JS/CSS with `build.manifest = true`
-2. **Server build** — Vite builds a Node.js-compatible SSR bundle of your server entry
-3. **Load server entry** — The CLI imports the built server entry
+1. **Scan pages** — `src/pages/*.ts` files are discovered and mapped to routes
+2. **Client build** — Vite builds client JS/CSS using a virtual entry that imports all page files
+3. **Server build** — Vite builds a Node.js SSR bundle using a virtual server entry with a `render()` switch
 4. **Render routes** — Each route is rendered using Lit SSR's `render()` + `collectResult()`
 5. **Inject assets** — JS/CSS links are resolved from the Vite manifest and injected into `<head>`
 6. **Write HTML** — Each route is written to `dist/<route>/index.html`
@@ -171,8 +163,10 @@ litSSG({
 ## What This Is Not
 
 - Not an online SSR server — output is purely static files
-- Not a file-based routing system — you provide explicit routes
 - Not a partial hydration / islands framework
+- Not a dynamic routing system — no `[slug].ts` parameterized routes
+- Not a nested layout system — no `layout.ts` convention
+- No recursive directory scanning — only flat `src/pages/` files
 
 ## License
 
