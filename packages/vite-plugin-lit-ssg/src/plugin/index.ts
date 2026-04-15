@@ -1,22 +1,37 @@
-import type { Plugin } from 'vite'
-import type { LitSSGOptions, ResolvedLitSSGOptions } from '../types.js'
+import type { Plugin, ResolvedConfig } from 'vite'
+import type { LitSSGOptionsNew } from '../types.js'
+import { scanPages } from '../scanner/pages.js'
+import { generateClientEntry } from '../virtual/client-entry.js'
+import { generateServerEntry } from '../virtual/server-entry.js'
+import type { PageEntry } from '../scanner/pages.js'
 
 const PLUGIN_NAME = 'vite-plugin-lit-ssg'
 
-const registeredOptions = new WeakMap<object, ResolvedLitSSGOptions>()
+const VIRTUAL_CLIENT_ID = 'virtual:lit-ssg-client'
+const VIRTUAL_SERVER_ID = 'virtual:lit-ssg-server'
+const RESOLVED_VIRTUAL_CLIENT_ID = '\0' + VIRTUAL_CLIENT_ID
+const RESOLVED_VIRTUAL_SERVER_ID = '\0' + VIRTUAL_SERVER_ID
 
-export function litSSG(options: LitSSGOptions): Plugin {
-  const resolved: ResolvedLitSSGOptions = {
-    entryServer: options.entryServer,
-    entryClient: options.entryClient,
-    routes: options.routes,
-    outDir: options.outDir ?? 'dist',
+interface PluginState {
+  pagesDir: string
+  resolvedConfig: ResolvedConfig | null
+  pages: PageEntry[]
+}
+
+const pluginState = new WeakMap<object, PluginState>()
+
+export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
+  const pagesDir = options.pagesDir ?? 'src/pages'
+
+  const state: PluginState = {
+    pagesDir,
+    resolvedConfig: null,
+    pages: [],
   }
-
-  validateOptions(resolved)
 
   const plugin: Plugin = {
     name: PLUGIN_NAME,
+
     config() {
       return {
         build: {
@@ -24,27 +39,42 @@ export function litSSG(options: LitSSGOptions): Plugin {
         },
       }
     },
+
+    configResolved(config) {
+      state.resolvedConfig = config
+    },
+
+    async buildStart() {
+      const root = state.resolvedConfig?.root ?? process.cwd()
+      state.pages = await scanPages(root, pagesDir)
+    },
+
+    resolveId(id) {
+      if (id === VIRTUAL_CLIENT_ID) return RESOLVED_VIRTUAL_CLIENT_ID
+      if (id === VIRTUAL_SERVER_ID) return RESOLVED_VIRTUAL_SERVER_ID
+      return undefined
+    },
+
+    load(id) {
+      if (id === RESOLVED_VIRTUAL_CLIENT_ID) {
+        return generateClientEntry(state.pages)
+      }
+      if (id === RESOLVED_VIRTUAL_SERVER_ID) {
+        return generateServerEntry(state.pages)
+      }
+      return undefined
+    },
   }
 
-  registeredOptions.set(plugin, resolved)
+  pluginState.set(plugin, state)
 
   return plugin
 }
 
-export function getSSGOptions(plugin: object): ResolvedLitSSGOptions | undefined {
-  return registeredOptions.get(plugin)
+export function getSSGOptions(plugin: object): { pagesDir: string } | undefined {
+  const state = pluginState.get(plugin)
+  if (!state) return undefined
+  return { pagesDir: state.pagesDir }
 }
 
 export { PLUGIN_NAME }
-
-function validateOptions(opts: ResolvedLitSSGOptions): void {
-  if (!opts.entryServer) {
-    throw new Error(`[${PLUGIN_NAME}] \`entryServer\` is required`)
-  }
-  if (!opts.entryClient) {
-    throw new Error(`[${PLUGIN_NAME}] \`entryClient\` is required`)
-  }
-  if (!opts.routes) {
-    throw new Error(`[${PLUGIN_NAME}] \`routes\` is required`)
-  }
-}
