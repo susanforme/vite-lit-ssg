@@ -4,6 +4,7 @@ import { loadConfigFromFile } from 'vite'
 import type { Plugin } from 'vite'
 import { PLUGIN_NAME, getSSGOptions } from './plugin/index.js'
 import { runSSG } from './runner/build.js'
+import { scanPages } from './scanner/pages.js'
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2)
@@ -64,9 +65,12 @@ async function main(): Promise<void> {
   }
 
   const base = config.base ?? '/'
+  const outDir = config.build?.outDir ?? 'dist'
   const resolvedConfigFile = configFile ? resolve(configFile) : loaded.path
 
-  await runSSG(ssgOpts, projectRoot, base, { mode, configFile: resolvedConfigFile })
+  const pages = await scanPages(projectRoot, ssgOpts.pagesDir)
+
+  await runSSG(pages, projectRoot, base, outDir, { mode, configFile: resolvedConfigFile })
 }
 
 function getFlagValue(args: string[], flag: string): string | undefined {
