@@ -1,0 +1,11 @@
+[
+  [
+    "src/entry-client.ts",
+    {
+      "file": "assets/entry-client-BcUAflNl.js",
+      "name": "entry-client",
+      "src": "src/entry-client.ts",
+      "isEntry": true
+    }
+  ]
+]

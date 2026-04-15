@@ -1,0 +1,8 @@
+dom-shim loaded
+customElements.getName(TestEl): test-el
+typeof customElements.getName: function
+customElements.get("test-el") === TestEl: true
+TestEl.tagName: undefined
+TestEl.__litTagName: undefined
+TestEl.__localName: test-el
+TestEl[Symbol.for("litTagName")]: undefined
