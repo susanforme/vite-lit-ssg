@@ -1,8 +1,5 @@
 import type { Plugin, ResolvedConfig } from 'vite'
 import type { LitSSGOptionsNew } from '../types.js'
-import { scanPages } from '../scanner/pages.js'
-import { generateClientEntry } from '../virtual/client-entry.js'
-import { generateServerEntry } from '../virtual/server-entry.js'
 import type { PageEntry } from '../scanner/pages.js'
 
 const PLUGIN_NAME = 'vite-plugin-lit-ssg'
@@ -45,6 +42,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     },
 
     async buildStart() {
+      const { scanPages } = await import('../scanner/pages.js')
       const root = state.resolvedConfig?.root ?? process.cwd()
       state.pages = await scanPages(root, pagesDir)
     },
@@ -55,11 +53,13 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       return undefined
     },
 
-    load(id) {
+    async load(id) {
       if (id === RESOLVED_VIRTUAL_CLIENT_ID) {
+        const { generateClientEntry } = await import('../virtual/client-entry.js')
         return generateClientEntry(state.pages)
       }
       if (id === RESOLVED_VIRTUAL_SERVER_ID) {
+        const { generateServerEntry } = await import('../virtual/server-entry.js')
         return generateServerEntry(state.pages)
       }
       return undefined

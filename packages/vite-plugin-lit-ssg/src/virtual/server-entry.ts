@@ -16,8 +16,7 @@ export function generateServerEntry(pages: PageEntry[]): string {
     })
     .join('\n')
 
-  return `import { html } from 'lit'
-import { unsafeStatic } from 'lit/static-html.js'
+  return `import { html, unsafeStatic } from 'lit/static-html.js'
 ${imports}
 
 export async function render(url, _ctx) {

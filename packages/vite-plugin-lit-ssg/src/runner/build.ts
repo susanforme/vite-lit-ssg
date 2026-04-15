@@ -56,9 +56,10 @@ export async function runSSG(
     await build({
       ...sharedBuildConfig,
       build: {
-        ssr: VIRTUAL_SERVER_ID,
+        ssr: true,
         outDir: serverBuildDir,
         rollupOptions: {
+          input: VIRTUAL_SERVER_ID,
           output: {
             format: 'esm',
             entryFileNames: SERVER_ENTRY_FILENAME,

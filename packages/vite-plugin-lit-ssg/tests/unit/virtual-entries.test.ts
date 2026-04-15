@@ -52,6 +52,7 @@ describe('generateServerEntry', () => {
 
   it('uses unsafeStatic for template rendering', () => {
     const result = generateServerEntry(pages)
+    expect(result).toContain("from 'lit/static-html.js'")
     expect(result).toContain('unsafeStatic(tag)')
   })
 
