@@ -1,2 +1,10 @@
 .history
+.DS_Store
 node_modules
+dist
+.sisyphus/*.local.md
+
+# playground build artifacts (temporary SSG test outputs)
+packages/playground/dist
+packages/playground/dist-*
+

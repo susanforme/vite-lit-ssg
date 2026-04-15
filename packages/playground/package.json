@@ -1,0 +1,17 @@
+{
+  "name": "playground",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "vite-lit-ssg build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lit": "^3.3.2",
+    "vite-plugin-lit-ssg": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
