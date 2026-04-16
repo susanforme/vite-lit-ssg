@@ -106,7 +106,42 @@ import type { IgnoreOption } from './scanner/pages.js'
 
 export type { IgnoreOption }
 
-export interface LitSSGOptionsNew {
+export type PreloadPolicy = 'inherit' | 'none' | 'entry-only'
+
+export interface PageModeOptions {
+  mode?: 'page'
   pagesDir?: string
   ignore?: IgnoreOption | IgnoreOption[]
+}
+
+export interface SingleComponentOptions {
+  mode: 'single-component'
+  /** Path to the component module (relative to project root, e.g. 'src/components/my-element.ts') */
+  entry: string
+  /** Named export to use. Defaults to 'default'. */
+  exportName?: string
+  /** Custom element tag to use as the wrapper. Defaults to 'lit-ssg-root'. */
+  wrapperTag?: string
+  /** Preload strategy. Defaults to 'inherit'. */
+  preload?: PreloadPolicy
+}
+
+export type LitSSGOptionsNew = PageModeOptions | SingleComponentOptions
+
+export interface ResolvedSingleComponentOptions {
+  mode: 'single-component'
+  entry: string
+  exportName: string
+  wrapperTag: string
+  preload: PreloadPolicy
+}
+
+export function resolveSingleComponentOptions(opts: SingleComponentOptions): ResolvedSingleComponentOptions {
+  return {
+    mode: 'single-component',
+    entry: opts.entry,
+    exportName: opts.exportName ?? 'default',
+    wrapperTag: opts.wrapperTag ?? 'lit-ssg-root',
+    preload: opts.preload ?? 'inherit',
+  }
 }

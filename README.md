@@ -142,6 +142,10 @@ The component class must use the `@customElement` decorator — the tag name is 
 
 ## Plugin Options
 
+`litSSG()` with no arguments defaults to **page mode** — the existing behavior described above. You can also opt into `single-component` mode for embedding a single prerendered component.
+
+### Page Mode (default)
+
 ```ts
 litSSG({
   pagesDir?: string  // default: 'src/pages'
@@ -151,6 +155,70 @@ litSSG({
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `pagesDir` | `string` | `'src/pages'` | Directory to scan for page files |
+
+### Single-Component Mode
+
+```ts
+litSSG({
+  mode: 'single-component',
+  entry: string,         // required: path to the component module (relative to project root)
+  exportName?: string,   // default: 'default'
+  wrapperTag?: string,   // default: 'lit-ssg-root'
+  preload?: 'inherit' | 'none' | 'entry-only',  // default: 'inherit'
+})
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `mode` | `'single-component'` | — | Enables single-component build |
+| `entry` | `string` | — | Module path to the component (e.g. `src/my-element.ts`) |
+| `exportName` | `string` | `'default'` | Named export to use as the component class |
+| `wrapperTag` | `string` | `'lit-ssg-root'` | Custom element tag that wraps the SSR output |
+| `preload` | `string` | `'inherit'` | Controls `<link rel="modulepreload">` injection: `inherit` = keep all preloads, `none` = remove all modulepreload links (CSS kept), `entry-only` = keep only the entry script (no CSS/preload links) |
+
+**Example:**
+
+```ts
+// vite.config.ts
+import { defineConfig } from 'vite'
+import { litSSG } from 'vite-plugin-lit-ssg'
+
+export default defineConfig({
+  plugins: [litSSG({
+    mode: 'single-component',
+    entry: 'src/my-widget.ts',
+    exportName: 'default',    // or a named export like 'MyWidget'
+    wrapperTag: 'my-app',
+    preload: 'entry-only',
+  })],
+})
+```
+
+**Output** — a single `dist/index.html`:
+
+```html
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- asset links per preload policy -->
+  </head>
+  <body dsd-pending>
+    <!-- DSD scripts -->
+    <my-app>
+      <my-widget>
+        <template shadowrootmode="open"><!-- SSR content --></template>
+      </my-widget>
+    </my-app>
+    <script type="module" src="/assets/lit-ssg-single-...js"></script>
+  </body>
+</html>
+```
+
+**Important:** Page-level APIs (`title`, `meta`, `lang`, `head`, `htmlAttrs`, `bodyAttrs`) are **not** supported in single-component mode. If you need page metadata, use page mode instead.
+
+Plain `litSSG()` (no arguments) always means **page mode** and is fully backward compatible.
 
 ## How It Works
 

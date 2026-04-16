@@ -1,7 +1,8 @@
 import { createRequire } from 'node:module'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
-import type { LitSSGOptionsNew } from '../types.js'
+import type { LitSSGOptionsNew, ResolvedSingleComponentOptions } from '../types.js'
+import { resolveSingleComponentOptions } from '../types.js'
 import type { PageEntry, ScanPagesOptions } from '../scanner/pages.js'
 
 const _require = createRequire(import.meta.url)
@@ -17,25 +18,51 @@ const RESOLVED_VIRTUAL_PAGE_PREFIX = '\0' + VIRTUAL_PAGE_PREFIX
 const VIRTUAL_DEV_PAGE_PREFIX = 'virtual:lit-ssg-dev-page/'
 const RESOLVED_VIRTUAL_DEV_PAGE_PREFIX = '\0' + VIRTUAL_DEV_PAGE_PREFIX
 
-interface PluginState {
+const VIRTUAL_SINGLE_CLIENT_ID = 'virtual:lit-ssg-single-client'
+const RESOLVED_VIRTUAL_SINGLE_CLIENT_ID = '\0' + VIRTUAL_SINGLE_CLIENT_ID
+const VIRTUAL_SINGLE_SERVER_ID = 'virtual:lit-ssg-single-server'
+const RESOLVED_VIRTUAL_SINGLE_SERVER_ID = '\0' + VIRTUAL_SINGLE_SERVER_ID
+const VIRTUAL_SINGLE_DEV_ID = 'virtual:lit-ssg-single-dev'
+const RESOLVED_VIRTUAL_SINGLE_DEV_ID = '\0' + VIRTUAL_SINGLE_DEV_ID
+
+interface PageModeState {
+  kind: 'page'
   pagesDir: string
   scanOptions: ScanPagesOptions
   resolvedConfig: ResolvedConfig | null
   pages: PageEntry[]
 }
 
+interface SingleComponentState {
+  kind: 'single-component'
+  resolved: ResolvedSingleComponentOptions
+  resolvedConfig: ResolvedConfig | null
+}
+
+type PluginState = PageModeState | SingleComponentState
+
 const pluginState = new WeakMap<object, PluginState>()
 
 export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
-  const pagesDir = options.pagesDir ?? 'src/pages'
+  let state: PluginState
 
-  const state: PluginState = {
-    pagesDir,
-    scanOptions: options.ignore != null
-      ? { pagesDir, ignore: options.ignore }
-      : { pagesDir },
-    resolvedConfig: null,
-    pages: [],
+  if (options.mode === 'single-component') {
+    state = {
+      kind: 'single-component',
+      resolved: resolveSingleComponentOptions(options),
+      resolvedConfig: null,
+    }
+  } else {
+    const pagesDir = options.pagesDir ?? 'src/pages'
+    state = {
+      kind: 'page',
+      pagesDir,
+      scanOptions: options.ignore != null
+        ? { pagesDir, ignore: options.ignore }
+        : { pagesDir },
+      resolvedConfig: null,
+      pages: [],
+    }
   }
 
   const plugin: Plugin = {
@@ -61,17 +88,58 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     },
 
     async buildStart() {
-      const { scanPages } = await import('../scanner/pages.js')
-      const root = state.resolvedConfig?.root ?? process.cwd()
-      state.pages = await scanPages(root, state.scanOptions)
+      if (state.kind === 'page') {
+        const { scanPages } = await import('../scanner/pages.js')
+        const root = state.resolvedConfig?.root ?? process.cwd()
+        state.pages = await scanPages(root, state.scanOptions)
+      }
     },
 
     configureServer(server: ViteDevServer) {
+      if (state.kind === 'single-component') {
+        server.middlewares.use(async (req, res, next) => {
+          const rawUrl = req.url ?? '/'
+          const pathname = (rawUrl.split('?')[0] ?? '/').split('#')[0] ?? '/'
+
+          if (req.method !== 'GET' && req.method !== 'HEAD') return next()
+
+          if (
+            pathname.startsWith('/@') ||
+            pathname.startsWith('/node_modules/') ||
+            /\.\w+$/.test(pathname.split('/').pop() ?? '')
+          ) {
+            return next()
+          }
+
+          const htmlTemplate = `<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dev</title>
+  </head>
+  <body>
+    <script type="module" src="/@id/__x00__${VIRTUAL_SINGLE_DEV_ID}"></script>
+  </body>
+</html>`
+
+          try {
+            const transformed = await server.transformIndexHtml(rawUrl, htmlTemplate)
+            res.setHeader('Content-Type', 'text/html; charset=utf-8')
+            res.statusCode = 200
+            res.end(transformed)
+          } catch (e) {
+            next(e)
+          }
+        })
+        return
+      }
+
       const root = server.config.root ?? process.cwd()
-      const absolutePagesDir = resolve(root, pagesDir)
+      const absolutePagesDir = resolve(root, state.pagesDir)
 
       const seedPages = async () => {
-        if (state.pages.length === 0) {
+        if (state.kind === 'page' && state.pages.length === 0) {
           const { scanPages } = await import('../scanner/pages.js')
           try {
             state.pages = await scanPages(root, state.scanOptions)
@@ -84,6 +152,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       const seedReady = seedPages()
 
       const rescanPages = async (addedFile?: string) => {
+        if (state.kind !== 'page') return
         await seedReady
         const { scanPages } = await import('../scanner/pages.js')
         const prevRoutes = new Set(state.pages.map((p) => p.route))
@@ -129,6 +198,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       })
 
       server.middlewares.use(async (req, res, next) => {
+        if (state.kind !== 'page') return next()
         const rawUrl = req.url ?? '/'
         const pathname = (rawUrl.split('?')[0] ?? '/').split('#')[0] ?? '/'
 
@@ -244,6 +314,12 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     },
 
     resolveId(id) {
+      if (state.kind === 'single-component') {
+        if (id === VIRTUAL_SINGLE_CLIENT_ID) return RESOLVED_VIRTUAL_SINGLE_CLIENT_ID
+        if (id === VIRTUAL_SINGLE_SERVER_ID) return RESOLVED_VIRTUAL_SINGLE_SERVER_ID
+        if (id === VIRTUAL_SINGLE_DEV_ID) return RESOLVED_VIRTUAL_SINGLE_DEV_ID
+        return undefined
+      }
       if (id === VIRTUAL_SHARED_ID) return RESOLVED_VIRTUAL_SHARED_ID
       if (id === VIRTUAL_SERVER_ID) return RESOLVED_VIRTUAL_SERVER_ID
       if (id.startsWith(VIRTUAL_PAGE_PREFIX)) {
@@ -256,15 +332,32 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     },
 
     async load(id) {
+      if (id === RESOLVED_VIRTUAL_SINGLE_CLIENT_ID) {
+        if (state.kind !== 'single-component') return undefined
+        const { generateSingleClientEntry } = await import('../virtual/single-client-entry.js')
+        return generateSingleClientEntry(state.resolved)
+      }
+      if (id === RESOLVED_VIRTUAL_SINGLE_SERVER_ID) {
+        if (state.kind !== 'single-component') return undefined
+        const { generateSingleServerEntry } = await import('../virtual/single-server-entry.js')
+        return generateSingleServerEntry(state.resolved)
+      }
+      if (id === RESOLVED_VIRTUAL_SINGLE_DEV_ID) {
+        if (state.kind !== 'single-component') return undefined
+        const { generateSingleDevEntry } = await import('../virtual/single-client-entry.js')
+        return generateSingleDevEntry(state.resolved)
+      }
       if (id === RESOLVED_VIRTUAL_SHARED_ID) {
         const { generateSharedEntry } = await import('../virtual/client-entry.js')
         return generateSharedEntry()
       }
       if (id === RESOLVED_VIRTUAL_SERVER_ID) {
+        if (state.kind !== 'page') return undefined
         const { generateServerEntry } = await import('../virtual/server-entry.js')
         return generateServerEntry(state.pages)
       }
       if (id.startsWith(RESOLVED_VIRTUAL_PAGE_PREFIX)) {
+        if (state.kind !== 'page') return undefined
         const pageName = id.slice(RESOLVED_VIRTUAL_PAGE_PREFIX.length)
         const page = state.pages.find((p) => p.slug === pageName)
         if (!page) {
@@ -276,6 +369,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         return generatePageEntry(page)
       }
       if (id.startsWith(RESOLVED_VIRTUAL_DEV_PAGE_PREFIX)) {
+        if (state.kind !== 'page') return undefined
         const pageName = id.slice(RESOLVED_VIRTUAL_DEV_PAGE_PREFIX.length)
         const page = state.pages.find((p) => {
           const routeName = p.route === '/' ? 'index' : p.route.slice(1)
@@ -307,9 +401,21 @@ if (tag) {
 
 export function getSSGOptions(plugin: object): ScanPagesOptions | undefined {
   const state = pluginState.get(plugin)
-  if (!state) return undefined
+  if (!state || state.kind !== 'page') return undefined
   return state.scanOptions
 }
 
-export { PLUGIN_NAME, VIRTUAL_PAGE_PREFIX, VIRTUAL_SHARED_ID }
+export function getSingleComponentOptions(plugin: object): ResolvedSingleComponentOptions | undefined {
+  const state = pluginState.get(plugin)
+  if (!state || state.kind !== 'single-component') return undefined
+  return state.resolved
+}
+
+export {
+  PLUGIN_NAME,
+  VIRTUAL_PAGE_PREFIX,
+  VIRTUAL_SHARED_ID,
+  VIRTUAL_SINGLE_CLIENT_ID,
+  VIRTUAL_SINGLE_SERVER_ID,
+}
 export type { ScanPagesOptions }

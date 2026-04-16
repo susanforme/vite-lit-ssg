@@ -56,6 +56,19 @@ importers:
         specifier: ^3.1.0
         version: 3.2.4(@types/node@22.19.17)
 
+  packages/vite-plugin-lit-ssg/tests/fixtures/single-component-app:
+    dependencies:
+      lit:
+        specifier: ^3.3.2
+        version: 3.3.2
+      vite-plugin-lit-ssg:
+        specifier: workspace:*
+        version: link:../../..
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.2(@types/node@22.19.17)
+
 packages:
 
   '@esbuild/aix-ppc64@0.25.12':

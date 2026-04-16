@@ -1,2 +1,3 @@
 packages:
   - packages/*
+  - packages/vite-plugin-lit-ssg/tests/fixtures/single-component-app

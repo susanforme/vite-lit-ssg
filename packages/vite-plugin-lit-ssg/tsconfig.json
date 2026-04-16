@@ -16,5 +16,5 @@
     "resolveJsonModule": true
   },
   "include": ["src/**/*", "tests/**/*"],
-  "exclude": ["node_modules", "dist", "playground"]
+  "exclude": ["node_modules", "dist", "playground", "tests/fixtures"]
 }

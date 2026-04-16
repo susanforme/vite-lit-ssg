@@ -13,3 +13,4 @@ packages/playground/dist-*
 
 .playwright-mcp
 temp
+packages/vite-plugin-lit-ssg/.sisyphus

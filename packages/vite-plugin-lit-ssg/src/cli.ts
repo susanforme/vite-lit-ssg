@@ -2,8 +2,9 @@
 import { resolve } from 'node:path'
 import { loadConfigFromFile } from 'vite'
 import type { Plugin } from 'vite'
-import { PLUGIN_NAME, getSSGOptions } from './plugin/index.js'
+import { PLUGIN_NAME, getSSGOptions, getSingleComponentOptions } from './plugin/index.js'
 import { runSSG } from './runner/build.js'
+import { runSingleSSG } from './runner/build-single.js'
 import { scanPages } from './scanner/pages.js'
 
 async function main(): Promise<void> {
@@ -57,16 +58,23 @@ async function main(): Promise<void> {
     process.exit(1)
   }
 
+  const base = config.base ?? '/'
+  const outDir = config.build?.outDir ?? 'dist'
+  const resolvedConfigFile = configFile ? resolve(configFile) : loaded.path
+
+  const singleOpts = getSingleComponentOptions(ssgPlugin)
+
+  if (singleOpts) {
+    await runSingleSSG(singleOpts, projectRoot, base, outDir, { mode, configFile: resolvedConfigFile })
+    return
+  }
+
   const ssgOpts = getSSGOptions(ssgPlugin)
 
   if (!ssgOpts) {
     console.error('[vite-lit-ssg] Failed to retrieve SSG options from plugin')
     process.exit(1)
   }
-
-  const base = config.base ?? '/'
-  const outDir = config.build?.outDir ?? 'dist'
-  const resolvedConfigFile = configFile ? resolve(configFile) : loaded.path
 
   const pages = await scanPages(projectRoot, ssgOpts)
 
