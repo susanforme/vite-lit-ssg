@@ -29,7 +29,8 @@
   },
   "dependencies": {
     "@lit-labs/ssr": "^4.0.0",
-    "@lit-labs/ssr-client": "^1.1.7"
+    "@lit-labs/ssr-client": "^1.1.7",
+    "tinyglobby": "^0.2.16"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

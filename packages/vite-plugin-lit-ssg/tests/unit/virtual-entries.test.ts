@@ -4,8 +4,8 @@ import { generateServerEntry } from '../../src/virtual/server-entry.js'
 import type { PageEntry } from '../../src/scanner/pages.js'
 
 const pages: PageEntry[] = [
-  { filePath: '/project/src/pages/index.ts', importPath: '/src/pages/index.ts', route: '/' },
-  { filePath: '/project/src/pages/about.ts', importPath: '/src/pages/about.ts', route: '/about' },
+  { filePath: '/project/src/pages/index.ts', importPath: '/src/pages/index.ts', route: '/', slug: 'index' },
+  { filePath: '/project/src/pages/about.ts', importPath: '/src/pages/about.ts', route: '/about', slug: 'about' },
 ]
 
 describe('generateSharedEntry', () => {

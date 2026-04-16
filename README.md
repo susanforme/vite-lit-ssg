@@ -106,17 +106,19 @@ dist/
 
 ## Page File Convention
 
-Place `.ts` files in `src/pages/` (flat, no subdirectories):
+Place `.ts` files in `src/pages/`. Subdirectories are supported — the directory structure maps to the route hierarchy:
 
 | File | Route |
 |---|---|
 | `src/pages/index.ts` | `/` |
 | `src/pages/about.ts` | `/about` |
-| `src/pages/Contact.ts` | `/Contact` |
+| `src/pages/blog/index.ts` | `/blog` |
+| `src/pages/blog/post.ts` | `/blog/post` |
 
 - Only `.ts` files are scanned (not `.js`, `.tsx`, etc.)
-- Filenames are used as-is (no case conversion)
-- No recursive scanning — only the top-level `src/pages/` directory
+- Filenames and directory names are used as-is (no case conversion)
+- `index.ts` at any directory level resolves to the parent route (e.g. `blog/index.ts` → `/blog`)
+- Two files that resolve to the same route (e.g. `about.ts` and `about/index.ts`) throw an error at startup
 
 ## `defineLitRoute()` API
 
@@ -152,7 +154,7 @@ litSSG({
 
 ## How It Works
 
-1. **Scan pages** — `src/pages/*.ts` files are discovered and mapped to routes
+1. **Scan pages** — `src/pages/**/*.ts` files are discovered recursively and mapped to routes
 2. **Client build** — Vite builds client JS/CSS using a virtual entry that imports all page files
 3. **Server build** — Vite builds a Node.js SSR bundle using a virtual server entry with a `render()` switch
 4. **Render routes** — Each route is rendered using Lit SSR's `render()` + `collectResult()`
@@ -166,7 +168,6 @@ litSSG({
 - Not a partial hydration / islands framework
 - Not a dynamic routing system — no `[slug].ts` parameterized routes
 - Not a nested layout system — no `layout.ts` convention
-- No recursive directory scanning — only flat `src/pages/` files
 
 ## License
 

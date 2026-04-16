@@ -41,9 +41,8 @@ export async function runSSG(
   const pageInputs: Record<string, string> = {}
   const routeToManifestKey = new Map<string, string>()
   for (const page of pages) {
-    const name = page.importPath.split('/').pop()!.replace(/\.ts$/, '')
-    const virtualId = `${VIRTUAL_PAGE_PREFIX}${name}`
-    pageInputs[`lit-ssg-page-${name}`] = virtualId
+    const virtualId = `${VIRTUAL_PAGE_PREFIX}${page.slug}`
+    pageInputs[`lit-ssg-page/${page.slug}`] = virtualId
     routeToManifestKey.set(page.route, virtualId)
   }
 

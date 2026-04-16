@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
+import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
 import type { LitSSGOptionsNew } from '../types.js'
 import type { PageEntry } from '../scanner/pages.js'
@@ -63,6 +63,39 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     },
 
     configureServer(server: ViteDevServer) {
+      const root = server.config.root ?? process.cwd()
+      const absolutePagesDir = resolve(root, pagesDir)
+
+      const rescanPages = async () => {
+        const { scanPages } = await import('../scanner/pages.js')
+        try {
+          state.pages = await scanPages(root, pagesDir)
+          for (const id of [RESOLVED_VIRTUAL_SHARED_ID, RESOLVED_VIRTUAL_SERVER_ID]) {
+            const mod = server.moduleGraph.getModuleById(id)
+            if (mod) server.moduleGraph.invalidateModule(mod)
+          }
+        } catch (err) {
+          server.config.logger.warn(
+            `[vite-plugin-lit-ssg] Page rescan failed: ${err instanceof Error ? err.message : String(err)}`,
+          )
+          return
+        }
+        server.ws.send({ type: 'full-reload' })
+      }
+
+      const isUnderPagesDir = (file: string) => {
+        const rel = relative(absolutePagesDir, file)
+        return !rel.startsWith('..') && !isAbsolute(rel)
+      }
+
+      server.watcher.add(absolutePagesDir)
+      server.watcher.on('add', (file) => {
+        if (isUnderPagesDir(file) && file.endsWith('.ts')) rescanPages()
+      })
+      server.watcher.on('unlink', (file) => {
+        if (isUnderPagesDir(file) && file.endsWith('.ts')) rescanPages()
+      })
+
       server.middlewares.use(async (req, res, next) => {
         const rawUrl = req.url ?? '/'
         const pathname = (rawUrl.split('?')[0] ?? '/').split('#')[0] ?? '/'
@@ -143,10 +176,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       }
       if (id.startsWith(RESOLVED_VIRTUAL_PAGE_PREFIX)) {
         const pageName = id.slice(RESOLVED_VIRTUAL_PAGE_PREFIX.length)
-        const page = state.pages.find((p) => {
-          const fileName = p.importPath.split('/').pop()!
-          return fileName.replace(/\.ts$/, '') === pageName
-        })
+        const page = state.pages.find((p) => p.slug === pageName)
         if (!page) {
           throw new Error(
             `[vite-plugin-lit-ssg] No page found for virtual module: ${id}. Available pages: ${state.pages.map((p) => p.importPath).join(', ')}`,

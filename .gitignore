@@ -5,6 +5,7 @@ dist
 .sisyphus/*.local.md
 .sisyphus/evidence
 .sisyphus/boulder.json
+.sisyphus/drafts
 
 # playground build artifacts (temporary SSG test outputs)
 packages/playground/dist
