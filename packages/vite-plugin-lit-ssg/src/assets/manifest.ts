@@ -12,27 +12,20 @@ export function resolveAssetsFromManifest(
   manifest: ViteManifest,
   base: string,
   routeDepth: number = 0,
+  pageEntryKey: string,
 ): AssetLinks {
-  const entryItems = Object.entries(manifest).filter(([, v]) => v.isEntry)
+  const entry = manifest[pageEntryKey]
 
-  if (entryItems.length === 0) {
+  if (!entry) {
     throw new Error(
-      '[vite-plugin-lit-ssg] No isEntry item found in manifest. Make sure the client build has an entry point.',
+      `[vite-plugin-lit-ssg] No manifest entry found for key "${pageEntryKey}". Available keys: ${Object.keys(manifest).join(', ')}`,
     )
   }
-
-  if (entryItems.length > 1) {
-    console.warn(
-      `[vite-plugin-lit-ssg] Multiple isEntry items found in manifest (${entryItems.length}). Using the first one.`,
-    )
-  }
-
-  const [entryKey, entry] = entryItems[0]!
 
   const isRelativeBase = isRelative(base)
 
   const js = formatHref(base, entry.file, isRelativeBase, routeDepth)
-  const css = collectCss(manifest, entryKey, base, isRelativeBase, routeDepth)
+  const css = collectCss(manifest, pageEntryKey, base, isRelativeBase, routeDepth)
   const modulepreloads = collectModulePreloads(manifest, entry.imports ?? [], base, isRelativeBase, routeDepth)
 
   return { js, css, modulepreloads }
@@ -88,10 +81,6 @@ function collectModulePreloads(
   }
 
   return hrefs
-}
-
-function normalizeEntryKey(entry: string): string {
-  return entry.startsWith('/') ? entry.slice(1) : entry
 }
 
 function isRelative(base: string): boolean {

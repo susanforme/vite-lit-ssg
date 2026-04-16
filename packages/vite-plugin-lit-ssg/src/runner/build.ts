@@ -6,12 +6,12 @@ import { loadServerEntry } from './load-server-entry.js'
 import { readManifest, resolveAssetsFromManifest } from '../assets/manifest.js'
 import { renderPage } from '../runtime/render-page.js'
 import { resolveRouteFilePath, routeDepth, writeRoute } from '../output/write-route.js'
+import { VIRTUAL_PAGE_PREFIX, VIRTUAL_SHARED_ID } from '../plugin/index.js'
 
 const SERVER_BUILD_PARENT = '.vite-ssg'
 const SERVER_BUILD_DIR_NAME = '.vite-ssg/server'
 const SERVER_ENTRY_FILENAME = 'entry-server.js'
 
-const VIRTUAL_CLIENT_ID = 'virtual:lit-ssg-client'
 const VIRTUAL_SERVER_ID = 'virtual:lit-ssg-server'
 
 export interface BuildContext {
@@ -38,6 +38,15 @@ export async function runSSG(
     logLevel: 'warn' as const,
   }
 
+  const pageInputs: Record<string, string> = {}
+  const routeToManifestKey = new Map<string, string>()
+  for (const page of pages) {
+    const name = page.importPath.split('/').pop()!.replace(/\.ts$/, '')
+    const virtualId = `${VIRTUAL_PAGE_PREFIX}${name}`
+    pageInputs[`lit-ssg-page-${name}`] = virtualId
+    routeToManifestKey.set(page.route, virtualId)
+  }
+
   console.log('[vite-lit-ssg] Starting client build...')
   await build({
     ...sharedBuildConfig,
@@ -45,7 +54,10 @@ export async function runSSG(
       outDir: resolvedOutDir,
       manifest: true,
       rollupOptions: {
-        input: VIRTUAL_CLIENT_ID,
+        input: {
+          'lit-ssg-shared': VIRTUAL_SHARED_ID,
+          ...pageInputs,
+        },
       },
     },
   })
@@ -88,7 +100,8 @@ export async function runSSG(
       }
 
       const depth = routeDepth(route)
-      const assets = resolveAssetsFromManifest(manifest, base, depth)
+      const pageKey = routeToManifestKey.get(route)!
+      const assets = resolveAssetsFromManifest(manifest, base, depth, pageKey)
       const html = await renderPage(pageResult, assets)
 
       const filePath = resolveRouteFilePath(route, resolvedOutDir)
