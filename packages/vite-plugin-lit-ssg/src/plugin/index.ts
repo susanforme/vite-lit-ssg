@@ -103,7 +103,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
           if (req.method !== 'GET' && req.method !== 'HEAD') return next()
 
-          if (pathname !== '/' && pathname !== '') return next()
+          if (pathname !== '/') return next()
 
           const htmlTemplate = `<!DOCTYPE html>
 <html>
