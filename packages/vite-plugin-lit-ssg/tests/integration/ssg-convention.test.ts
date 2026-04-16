@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { execSync } from 'node:child_process'
 import { readFile, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
-import { runSSG } from '../../src/runner/build.js'
-import { scanPages } from '../../src/scanner/pages.js'
 
 const PLAYGROUND_ROOT = resolve(import.meta.dirname, '../../../playground')
 const DIST_DIR = join(PLAYGROUND_ROOT, 'dist-convention-test')
@@ -11,8 +10,10 @@ const DIST_DIR = join(PLAYGROUND_ROOT, 'dist-convention-test')
 describe('SSG convention-based integration', () => {
   beforeAll(async () => {
     await rm(DIST_DIR, { recursive: true, force: true })
-    const pages = await scanPages(PLAYGROUND_ROOT, 'src/pages')
-    await runSSG(pages, PLAYGROUND_ROOT, '/', DIST_DIR)
+    execSync('pnpm vite-lit-ssg build --config vite.config.convention-test.ts', {
+      cwd: PLAYGROUND_ROOT,
+      stdio: 'pipe',
+    })
   }, 120_000)
 
   afterAll(async () => {
