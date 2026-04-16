@@ -1,6 +1,9 @@
+import { createRequire } from 'node:module'
 import type { Plugin, ResolvedConfig } from 'vite'
 import type { LitSSGOptionsNew } from '../types.js'
 import type { PageEntry } from '../scanner/pages.js'
+
+const _require = createRequire(import.meta.url)
 
 const PLUGIN_NAME = 'vite-plugin-lit-ssg'
 
@@ -30,9 +33,15 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     name: PLUGIN_NAME,
 
     config() {
+      const ssrClientPath = _require.resolve('@lit-labs/ssr-client/lit-element-hydrate-support.js')
       return {
         build: {
           manifest: true,
+        },
+        resolve: {
+          alias: {
+            '@lit-labs/ssr-client/lit-element-hydrate-support.js': ssrClientPath,
+          },
         },
       }
     },

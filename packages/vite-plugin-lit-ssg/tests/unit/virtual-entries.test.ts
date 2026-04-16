@@ -20,10 +20,24 @@ describe('generateClientEntry', () => {
     expect(result.endsWith('\n')).toBe(true)
   })
 
-  it('generates one import per page', () => {
+  it('generates one import per page plus the hydration support import', () => {
     const result = generateClientEntry(pages)
     const lines = result.trim().split('\n')
-    expect(lines).toHaveLength(2)
+    expect(lines).toHaveLength(3) // 1 hydrate + 2 page imports
+  })
+
+  it('puts hydration support import first before page imports', () => {
+    const result = generateClientEntry(pages)
+    const lines = result.trim().split('\n')
+    expect(lines[0]).toContain('@lit-labs/ssr-client/lit-element-hydrate-support.js')
+    expect(lines[1]).toContain('/src/pages/index.ts')
+  })
+
+  it('still emits hydration support import when pages list is empty', () => {
+    const result = generateClientEntry([])
+    expect(result).toContain('@lit-labs/ssr-client/lit-element-hydrate-support.js')
+    expect(result).not.toContain('/src/pages/')
+    expect(result.trim().split('\n')).toHaveLength(1)
   })
 })
 

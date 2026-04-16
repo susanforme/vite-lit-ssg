@@ -67,4 +67,19 @@ describe('SSG convention-based integration', () => {
     expect(existsSync(join(PLAYGROUND_ROOT, 'src', 'entry-server.ts'))).toBe(false)
     expect(existsSync(join(PLAYGROUND_ROOT, 'src', 'entry-client.ts'))).toBe(false)
   })
+
+  it('index.html has dsd-pending attribute on body for hydration', async () => {
+    const content = await readFile(join(DIST_DIR, 'index.html'), 'utf-8')
+    expect(content).toContain('<body dsd-pending')
+  })
+
+  it('index.html has DSD feature-detection script', async () => {
+    const content = await readFile(join(DIST_DIR, 'index.html'), 'utf-8')
+    expect(content).toContain("'shadowrootmode'in HTMLTemplateElement.prototype")
+  })
+
+  it('index.html has DSD polyfill async loader', async () => {
+    const content = await readFile(join(DIST_DIR, 'index.html'), 'utf-8')
+    expect(content).toContain('hydrateShadowRoots')
+  })
 })

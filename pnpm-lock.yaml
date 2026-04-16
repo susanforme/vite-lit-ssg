@@ -33,6 +33,9 @@ importers:
       '@lit-labs/ssr':
         specifier: ^4.0.0
         version: 4.0.0(@types/node@22.19.17)
+      '@lit-labs/ssr-client':
+        specifier: ^1.1.7
+        version: 1.1.8
     devDependencies:
       '@types/node':
         specifier: ^22.0.0

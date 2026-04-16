@@ -16,7 +16,7 @@ describe('renderPage', () => {
     expect(html_str).toContain('<!doctype html>')
     expect(html_str).toContain('<html')
     expect(html_str).toContain('<head>')
-    expect(html_str).toContain('<body>')
+    expect(html_str).toContain('<body')
     expect(html_str).toContain('home-page')
     expect(html_str).toContain('entry-client.js')
     expect(html_str).toContain('style.css')
@@ -101,5 +101,37 @@ describe('renderPage', () => {
     }
     const html_str = await renderPage(page, baseAssets)
     expect(html_str).toContain('class="foo&quot;bar"')
+  })
+
+  it('has dsd-pending attribute on body', async () => {
+    const html_str = await renderPage(null, baseAssets)
+    expect(html_str).toContain('<body dsd-pending')
+  })
+
+  it('has dsd-pending style in head to prevent FOUC', async () => {
+    const html_str = await renderPage(null, baseAssets)
+    expect(html_str).toContain('body[dsd-pending]')
+    expect(html_str).toContain('display:none')
+  })
+
+  it('has DSD feature-detection inline script', async () => {
+    const html_str = await renderPage(null, baseAssets)
+    expect(html_str).toContain("'shadowrootmode'in HTMLTemplateElement.prototype")
+  })
+
+  it('has DSD polyfill async loader script', async () => {
+    const html_str = await renderPage(null, baseAssets)
+    expect(html_str).toContain('hydrateShadowRoots')
+    expect(html_str).toContain('template-shadowroot')
+  })
+
+  it('dsd-pending and custom bodyAttrs coexist', async () => {
+    const page = {
+      template: html`<p>content</p>`,
+      bodyAttrs: { class: 'page-class' },
+    }
+    const html_str = await renderPage(page, baseAssets)
+    expect(html_str).toContain('<body dsd-pending')
+    expect(html_str).toContain('class="page-class"')
   })
 })
