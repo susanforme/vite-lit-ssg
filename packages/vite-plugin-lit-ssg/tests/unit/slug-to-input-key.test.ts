@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { slugToInputKey } from '../../src/runner/build.js'
+import { slugToInputKey, buildPageInputs } from '../../src/runner/build.js'
+import type { PageEntry } from '../../src/scanner/pages.js'
+
+function makePage(slug: string, route: string): PageEntry {
+  return { slug, route, filePath: `/src/pages/${slug}.ts`, importPath: `/src/pages/${slug}.ts` }
+}
 
 describe('slugToInputKey', () => {
   it('returns simple slug unchanged', () => {
@@ -38,5 +43,40 @@ describe('slugToInputKey', () => {
       expect(key).not.toContain('lit-ssg-page')
       expect(key).not.toContain('/')
     }
+  })
+})
+
+describe('buildPageInputs', () => {
+  it('produces flat input keys for simple slugs', () => {
+    const pages = [makePage('index', '/'), makePage('about', '/about')]
+    const { pageInputs } = buildPageInputs(pages)
+    expect(Object.keys(pageInputs)).toEqual(['index', 'about'])
+  })
+
+  it('produces flat input keys for nested slugs — no subfolders', () => {
+    const pages = [makePage('test/child', '/test/child'), makePage('test/index', '/test')]
+    const { pageInputs } = buildPageInputs(pages)
+    expect(Object.keys(pageInputs)).toEqual(['test-child', 'test-index'])
+    for (const key of Object.keys(pageInputs)) {
+      expect(key).not.toContain('/')
+      expect(key).not.toContain('lit-ssg-page')
+    }
+  })
+
+  it('maps virtual IDs correctly for manifest resolution', () => {
+    const pages = [makePage('about', '/about')]
+    const { pageInputs, routeToManifestKey } = buildPageInputs(pages)
+    expect(pageInputs['about']).toBe('virtual:lit-ssg-page/about')
+    expect(routeToManifestKey.get('/about')).toBe('virtual:lit-ssg-page/about')
+  })
+
+  it('throws when two slugs normalize to the same key', () => {
+    const pages = [makePage('test-child', '/test-child'), makePage('test/child', '/test/child')]
+    expect(() => buildPageInputs(pages)).toThrow('test-child')
+  })
+
+  it('throws when a slug conflicts with lit-ssg-shared', () => {
+    const pages = [makePage('lit/ssg/shared', '/lit/ssg/shared')]
+    expect(() => buildPageInputs(pages)).toThrow('lit-ssg-shared')
   })
 })

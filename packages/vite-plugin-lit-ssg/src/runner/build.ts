@@ -25,6 +25,31 @@ export function slugToInputKey(slug: string): string {
   return key
 }
 
+export interface PageInputResult {
+  pageInputs: Record<string, string>
+  routeToManifestKey: Map<string, string>
+}
+
+export function buildPageInputs(pages: PageEntry[]): PageInputResult {
+  const pageInputs: Record<string, string> = {}
+  const inputKeyToSlug = new Map<string, string>()
+  const routeToManifestKey = new Map<string, string>()
+  for (const page of pages) {
+    const virtualId = `${VIRTUAL_PAGE_PREFIX}${page.slug}`
+    const inputKey = slugToInputKey(page.slug)
+    if (inputKeyToSlug.has(inputKey)) {
+      throw new Error(
+        `[vite-plugin-lit-ssg] Page slug "${page.slug}" and "${inputKeyToSlug.get(inputKey)}" both normalize to the same ` +
+          `asset name "${inputKey}". Rename one of the page files to avoid this conflict.`,
+      )
+    }
+    inputKeyToSlug.set(inputKey, page.slug)
+    pageInputs[inputKey] = virtualId
+    routeToManifestKey.set(page.route, virtualId)
+  }
+  return { pageInputs, routeToManifestKey }
+}
+
 export interface BuildContext {
   mode: string
   configFile: string | false | undefined
@@ -49,22 +74,7 @@ export async function runSSG(
     logLevel: 'warn' as const,
   }
 
-  const pageInputs: Record<string, string> = {}
-  const inputKeyToSlug = new Map<string, string>()
-  const routeToManifestKey = new Map<string, string>()
-  for (const page of pages) {
-    const virtualId = `${VIRTUAL_PAGE_PREFIX}${page.slug}`
-    const inputKey = slugToInputKey(page.slug)
-    if (inputKeyToSlug.has(inputKey)) {
-      throw new Error(
-        `[vite-plugin-lit-ssg] Page slug "${page.slug}" and "${inputKeyToSlug.get(inputKey)}" both normalize to the same ` +
-          `asset name "${inputKey}". Rename one of the page files to avoid this conflict.`,
-      )
-    }
-    inputKeyToSlug.set(inputKey, page.slug)
-    pageInputs[inputKey] = virtualId
-    routeToManifestKey.set(page.route, virtualId)
-  }
+  const { pageInputs, routeToManifestKey } = buildPageInputs(pages)
 
   console.log('[vite-lit-ssg] Starting client build...')
   await build({
