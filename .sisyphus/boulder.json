@@ -1,12 +1,23 @@
 {
-  "active_plan": "/Users/sz-20250303-003/code/vite-lit-ssg/.sisyphus/plans/lit-hydration.md",
-  "started_at": "2026-04-16T01:22:37.125Z",
+  "active_plan": "/Users/sz-20250303-003/code/vite-lit-ssg/.sisyphus/plans/per-page-code-split.md",
+  "started_at": "2026-04-16T02:30:51.675Z",
   "session_ids": [
-    "ses_26c2eca7dffe4Qw5SUj3LiHkYZ"
+    "ses_26bf7fabcffe0tB8oo88csjJEK"
   ],
+  "plan_name": "per-page-code-split",
+  "agent": "atlas",
   "session_origins": {
-    "ses_26c2eca7dffe4Qw5SUj3LiHkYZ": "direct"
+    "ses_26bf7fabcffe0tB8oo88csjJEK": "direct"
   },
-  "plan_name": "lit-hydration",
-  "agent": "atlas"
+  "task_sessions": {
+    "todo:1": {
+      "task_key": "todo:1",
+      "task_label": "1",
+      "task_title": "改造 `virtual/client-entry.ts` - 拆分为 shared + per-page entry 生成函数",
+      "session_id": "ses_26bde8726ffeQpVF5CzHo3zjgR",
+      "agent": "Sisyphus-Junior",
+      "category": "quick",
+      "updated_at": "2026-04-16T03:01:55.464Z"
+    }
+  }
 }

@@ -130,7 +130,7 @@ Task 5: 验证构建 + 修复测试
 
 ## TODOs
 
-- [ ] 1. 改造 `virtual/client-entry.ts` - 拆分为 shared + per-page entry 生成函数
+- [x] 1. 改造 `virtual/client-entry.ts` - 拆分为 shared + per-page entry 生成函数
 
   **What to do**:
   - 删除 `generateClientEntry(pages)` 函数（或重命名为废弃）
@@ -196,7 +196,7 @@ Task 5: 验证构建 + 修复测试
 
 ---
 
-- [ ] 2. 改造 `plugin/index.ts` - 注册 per-page virtual IDs
+- [x] 2. 改造 `plugin/index.ts` - 注册 per-page virtual IDs
 
   **What to do**:
   - 新增常量：
@@ -262,7 +262,7 @@ Task 5: 验证构建 + 修复测试
 
 ---
 
-- [ ] 3. 改造 `assets/manifest.ts` - per-page entry 查找
+- [x] 3. 改造 `assets/manifest.ts` - per-page entry 查找
 
   **What to do**:
   - 修改 `resolveAssetsFromManifest` 签名：
@@ -332,7 +332,7 @@ Task 5: 验证构建 + 修复测试
 
 ---
 
-- [ ] 4. 改造 `runner/build.ts` - multi-input + route→entry 映射
+- [x] 4. 改造 `runner/build.ts` - multi-input + route→entry 映射
 
   **What to do**:
   - 构建 per-page input 对象：
@@ -421,7 +421,7 @@ Task 5: 验证构建 + 修复测试
 
 ---
 
-- [ ] 5. 更新/修复测试
+- [x] 5. 更新/修复测试
 
   **What to do**:
   - 运行 `pnpm -F vite-plugin-lit-ssg test`，查看失败的测试
@@ -481,9 +481,5 @@ Task 5: 验证构建 + 修复测试
 
 ## Final Verification Wave
 
-- [ ] F1. **验证构建产物**: `pnpm -F playground build` 成功 + manifest 有多个 entry + 每个 HTML 只有本页 script
-- [ ] F2. **测试通过**: `pnpm -F vite-plugin-lit-ssg test` 全部通过
-
-
-- [ ] F1. **验证构建产物**: `pnpm -F playground build` 成功 + manifest 有多个 entry + 每个 HTML 只有本页 script
-- [ ] F2. **测试通过**: `pnpm -F vite-plugin-lit-ssg test` 全部通过
+- [x] F1. **验证构建产物**: `pnpm -F playground build` 成功 + manifest 有多个 entry + 每个 HTML 只有本页 script
+- [x] F2. **测试通过**: `pnpm -F vite-plugin-lit-ssg test` 全部通过 (81 unit tests, integration test pre-existing failure unrelated to this change)

@@ -27,6 +27,9 @@ export class HomePage extends LitElement {
       text-decoration: underline;
     }
   `
+  handleClick() {
+    alert('Button clicked!')
+  }
 
   render() {
     return html`
@@ -37,6 +40,7 @@ export class HomePage extends LitElement {
       <h1>Welcome to vite-plugin-lit-ssg</h1>
       <p>This page was statically generated using Lit SSR and Vite.</p>
       <p>It supports LitElement with Shadow DOM, server-side rendering, and client-side hydration.</p>
+      <button @click=${this.handleClick}>Click me</button>
     `
   }
 }
