@@ -127,7 +127,65 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           return false
         })
 
-        if (!matchedPage) return next()
+        if (!matchedPage) {
+          const accept = req.headers['accept'] ?? ''
+          if (
+            !accept.includes('text/html') ||
+            pathname.startsWith('/@') ||
+            pathname.startsWith('/node_modules/') ||
+            /\.\w+$/.test(pathname.split('/').pop() ?? '')
+          ) {
+            return next()
+          }
+
+          const safeRoutePath = routePath
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+
+          const homeHref = base === '/' || base === '' ? '/' : base
+
+          const html404 = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>404 Not Found</title>
+    <style>
+      body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f5f5f5; }
+      .container { text-align: center; padding: 2rem; }
+      h1 { font-size: 6rem; margin: 0; color: #333; }
+      p { color: #666; font-size: 1.2rem; }
+      a { color: #646cff; text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .badge { display: inline-block; background: #ff6b35; color: white; font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; margin-bottom: 1rem; font-weight: bold; letter-spacing: 0.05em; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="badge">DEV ONLY</div>
+      <h1>404</h1>
+      <p>Page not found: <code>${safeRoutePath}</code></p>
+      <p><a href="${homeHref}">← Back to home</a></p>
+    </div>
+  </body>
+</html>`
+          res.setHeader('Content-Type', 'text/html; charset=utf-8')
+          res.statusCode = 404
+          if (req.method === 'HEAD') {
+            res.setHeader('Content-Length', Buffer.byteLength(html404))
+            res.end()
+          } else {
+            try {
+              const transformed = await server.transformIndexHtml(rawUrl, html404)
+              res.end(transformed)
+            } catch {
+              res.end(html404)
+            }
+          }
+          return
+        }
 
         const devPageId = `${VIRTUAL_DEV_PAGE_PREFIX}${matchedPage.route === '/' ? 'index' : matchedPage.route.slice(1)}`
         const htmlTemplate = `<!DOCTYPE html>
