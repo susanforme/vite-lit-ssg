@@ -4,6 +4,7 @@ node_modules
 dist
 .sisyphus/*.local.md
 .sisyphus/evidence
+.sisyphus/boulder.json
 
 # playground build artifacts (temporary SSG test outputs)
 packages/playground/dist

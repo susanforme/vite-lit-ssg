@@ -141,7 +141,7 @@ Parallel Speedup: ~50% faster than sequential
 
 ---
 
-- [ ] 1. 添加 `@lit-labs/ssr-client` 到 plugin 的 dependencies
+- [x] 1. 添加 `@lit-labs/ssr-client` 到 plugin 的 dependencies
 
   **What to do**:
   - 编辑 `packages/vite-plugin-lit-ssg/package.json`
@@ -208,7 +208,7 @@ Parallel Speedup: ~50% faster than sequential
 
 ---
 
-- [ ] 2. Vite plugin 添加 `resolve.alias` 将 ssr-client bare specifier 映射到绝对路径
+- [x] 2. Vite plugin 添加 `resolve.alias` 将 ssr-client bare specifier 映射到绝对路径
 
   **What to do**:
   - 编辑 `packages/vite-plugin-lit-ssg/src/plugin/index.ts`
@@ -304,7 +304,7 @@ Parallel Speedup: ~50% faster than sequential
 
 ---
 
-- [ ] 3. 修改 `generateClientEntry()` — 注入水合 import 为第一行
+- [x] 3. 修改 `generateClientEntry()` — 注入水合 import 为第一行
 
   **What to do**:
   - 编辑 `packages/vite-plugin-lit-ssg/src/virtual/client-entry.ts`
@@ -385,7 +385,7 @@ Parallel Speedup: ~50% faster than sequential
 
 ---
 
-- [ ] 4. 修改 `render-page.ts` — 添加 DSD polyfill 支持到 HTML 模板
+- [x] 4. 修改 `render-page.ts` — 添加 DSD polyfill 支持到 HTML 模板
 
   **What to do**:
   - 编辑 `packages/vite-plugin-lit-ssg/src/runtime/render-page.ts`
@@ -492,7 +492,7 @@ Parallel Speedup: ~50% faster than sequential
 
 ---
 
-- [ ] 5. 更新 `virtual-entries.test.ts` — 同步测试期望到新的 entry 格式
+- [x] 5. 更新 `virtual-entries.test.ts` — 同步测试期望到新的 entry 格式
 
   **What to do**:
   - 编辑 `packages/vite-plugin-lit-ssg/tests/unit/virtual-entries.test.ts`
@@ -546,7 +546,7 @@ Parallel Speedup: ~50% faster than sequential
 
 ---
 
-- [ ] 6. 更新 `render-page.test.ts` — 添加 DSD polyfill 相关断言
+- [x] 6. 更新 `render-page.test.ts` — 添加 DSD polyfill 相关断言
 
   **What to do**:
   - 编辑 `packages/vite-plugin-lit-ssg/tests/unit/render-page.test.ts`
@@ -603,7 +603,7 @@ Parallel Speedup: ~50% faster than sequential
 
 ---
 
-- [ ] 7. 更新 `ssg-convention.test.ts` — 添加水合相关集成断言
+- [x] 7. 更新 `ssg-convention.test.ts` — 添加水合相关集成断言
 
   **What to do**:
   - 编辑 `packages/vite-plugin-lit-ssg/tests/integration/ssg-convention.test.ts`
@@ -659,7 +659,7 @@ Parallel Speedup: ~50% faster than sequential
 
 ## Final Verification Wave (MANDATORY — after ALL implementation tasks)
 
-- [ ] F1. **全量测试 + 最终验证** — `unspecified-high`
+- [x] F1. **全量测试 + 最终验证**
 
   运行全量测试套件，验证所有修改的正确性和一致性：
 
