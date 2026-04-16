@@ -116,3 +116,31 @@ describe('single-component SSG integration', () => {
     })
   })
 })
+
+describe('named export integration', () => {
+  const DIST_NAMED = join(FIXTURE_ROOT, 'dist-test-named-export')
+
+  beforeAll(async () => {
+    await rm(DIST_NAMED, { recursive: true, force: true })
+    execSync('pnpm vite-lit-ssg build --config vite.config.named-export.ts', {
+      cwd: FIXTURE_ROOT,
+      stdio: 'pipe',
+    })
+  }, 120_000)
+
+  afterAll(async () => {
+    await rm(DIST_NAMED, { recursive: true, force: true })
+  })
+
+  it('generates index.html with named export wrapper tag', async () => {
+    const content = await readFile(join(DIST_NAMED, 'index.html'), 'utf-8')
+    expect(content).toContain('<demo-named-root>')
+    expect(content).toContain('</demo-named-root>')
+  })
+
+  it('generates DSD markup for named export component', async () => {
+    const content = await readFile(join(DIST_NAMED, 'index.html'), 'utf-8')
+    expect(content).toContain('demo-widget')
+    expect(content).toContain('shadowrootmode')
+  })
+})
