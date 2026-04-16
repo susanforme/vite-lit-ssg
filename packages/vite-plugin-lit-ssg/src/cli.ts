@@ -68,7 +68,7 @@ async function main(): Promise<void> {
   const outDir = config.build?.outDir ?? 'dist'
   const resolvedConfigFile = configFile ? resolve(configFile) : loaded.path
 
-  const pages = await scanPages(projectRoot, ssgOpts.pagesDir)
+  const pages = await scanPages(projectRoot, ssgOpts)
 
   await runSSG(pages, projectRoot, base, outDir, { mode, configFile: resolvedConfigFile })
 }

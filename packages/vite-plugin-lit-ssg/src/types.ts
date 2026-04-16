@@ -102,6 +102,11 @@ export interface ManifestEntry {
  */
 export type ViteManifest = Record<string, ManifestEntry>
 
+import type { IgnoreOption } from './scanner/pages.js'
+
+export type { IgnoreOption }
+
 export interface LitSSGOptionsNew {
   pagesDir?: string
+  ignore?: IgnoreOption | IgnoreOption[]
 }

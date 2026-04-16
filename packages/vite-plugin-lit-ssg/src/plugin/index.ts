@@ -2,7 +2,7 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
 import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
 import type { LitSSGOptionsNew } from '../types.js'
-import type { PageEntry } from '../scanner/pages.js'
+import type { PageEntry, ScanPagesOptions } from '../scanner/pages.js'
 
 const _require = createRequire(import.meta.url)
 
@@ -19,6 +19,7 @@ const RESOLVED_VIRTUAL_DEV_PAGE_PREFIX = '\0' + VIRTUAL_DEV_PAGE_PREFIX
 
 interface PluginState {
   pagesDir: string
+  scanOptions: ScanPagesOptions
   resolvedConfig: ResolvedConfig | null
   pages: PageEntry[]
 }
@@ -30,6 +31,9 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
   const state: PluginState = {
     pagesDir,
+    scanOptions: options.ignore != null
+      ? { pagesDir, ignore: options.ignore }
+      : { pagesDir },
     resolvedConfig: null,
     pages: [],
   }
@@ -59,17 +63,32 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     async buildStart() {
       const { scanPages } = await import('../scanner/pages.js')
       const root = state.resolvedConfig?.root ?? process.cwd()
-      state.pages = await scanPages(root, pagesDir)
+      state.pages = await scanPages(root, state.scanOptions)
     },
 
     configureServer(server: ViteDevServer) {
       const root = server.config.root ?? process.cwd()
       const absolutePagesDir = resolve(root, pagesDir)
 
-      const rescanPages = async () => {
+      const seedPages = async () => {
+        if (state.pages.length === 0) {
+          const { scanPages } = await import('../scanner/pages.js')
+          try {
+            state.pages = await scanPages(root, state.scanOptions)
+          } catch {
+            // pages dir may not exist yet; watcher will pick up additions
+          }
+        }
+      }
+
+      const seedReady = seedPages()
+
+      const rescanPages = async (addedFile?: string) => {
+        await seedReady
         const { scanPages } = await import('../scanner/pages.js')
+        const prevRoutes = new Set(state.pages.map((p) => p.route))
         try {
-          state.pages = await scanPages(root, pagesDir)
+          state.pages = await scanPages(root, state.scanOptions)
           for (const id of [RESOLVED_VIRTUAL_SHARED_ID, RESOLVED_VIRTUAL_SERVER_ID]) {
             const mod = server.moduleGraph.getModuleById(id)
             if (mod) server.moduleGraph.invalidateModule(mod)
@@ -80,6 +99,16 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           )
           return
         }
+        if (addedFile) {
+          for (const page of state.pages) {
+            if (!prevRoutes.has(page.route)) {
+              server.config.logger.info(
+                `[vite-plugin-lit-ssg] New route detected: ${page.route} → ${page.importPath}`,
+                { timestamp: true },
+              )
+            }
+          }
+        }
         server.ws.send({ type: 'full-reload' })
       }
 
@@ -88,12 +117,15 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         return !rel.startsWith('..') && !isAbsolute(rel)
       }
 
+      const isPageFile = (file: string) =>
+        /\.(ts|tsx|js|jsx)$/.test(file)
+
       server.watcher.add(absolutePagesDir)
       server.watcher.on('add', (file) => {
-        if (isUnderPagesDir(file) && file.endsWith('.ts')) rescanPages()
+        if (isUnderPagesDir(file) && isPageFile(file)) rescanPages(file)
       })
       server.watcher.on('unlink', (file) => {
-        if (isUnderPagesDir(file) && file.endsWith('.ts')) rescanPages()
+        if (isUnderPagesDir(file) && isPageFile(file)) rescanPages()
       })
 
       server.middlewares.use(async (req, res, next) => {
@@ -105,7 +137,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         if (state.pages.length === 0) {
           const { scanPages } = await import('../scanner/pages.js')
           const root = state.resolvedConfig?.root ?? process.cwd()
-          state.pages = await scanPages(root, pagesDir)
+          state.pages = await scanPages(root, state.scanOptions)
         }
 
         const base = state.resolvedConfig?.base ?? '/'
@@ -273,10 +305,11 @@ if (tag) {
   return plugin
 }
 
-export function getSSGOptions(plugin: object): { pagesDir: string } | undefined {
+export function getSSGOptions(plugin: object): ScanPagesOptions | undefined {
   const state = pluginState.get(plugin)
   if (!state) return undefined
-  return { pagesDir: state.pagesDir }
+  return state.scanOptions
 }
 
 export { PLUGIN_NAME, VIRTUAL_PAGE_PREFIX, VIRTUAL_SHARED_ID }
+export type { ScanPagesOptions }
