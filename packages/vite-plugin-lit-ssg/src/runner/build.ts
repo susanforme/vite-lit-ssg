@@ -14,6 +14,17 @@ const SERVER_ENTRY_FILENAME = 'entry-server.js'
 
 const VIRTUAL_SERVER_ID = 'virtual:lit-ssg-server'
 
+export function slugToInputKey(slug: string): string {
+  const key = slug.replace(/\//g, '-')
+  if (key === 'lit-ssg-shared') {
+    throw new Error(
+      `[vite-plugin-lit-ssg] Page slug "${slug}" conflicts with the reserved internal entry "lit-ssg-shared". ` +
+        'Rename the page file to avoid this conflict.',
+    )
+  }
+  return key
+}
+
 export interface BuildContext {
   mode: string
   configFile: string | false | undefined
@@ -39,10 +50,19 @@ export async function runSSG(
   }
 
   const pageInputs: Record<string, string> = {}
+  const inputKeyToSlug = new Map<string, string>()
   const routeToManifestKey = new Map<string, string>()
   for (const page of pages) {
     const virtualId = `${VIRTUAL_PAGE_PREFIX}${page.slug}`
-    pageInputs[`lit-ssg-page/${page.slug}`] = virtualId
+    const inputKey = slugToInputKey(page.slug)
+    if (inputKeyToSlug.has(inputKey)) {
+      throw new Error(
+        `[vite-plugin-lit-ssg] Page slug "${page.slug}" and "${inputKeyToSlug.get(inputKey)}" both normalize to the same ` +
+          `asset name "${inputKey}". Rename one of the page files to avoid this conflict.`,
+      )
+    }
+    inputKeyToSlug.set(inputKey, page.slug)
+    pageInputs[inputKey] = virtualId
     routeToManifestKey.set(page.route, virtualId)
   }
 
