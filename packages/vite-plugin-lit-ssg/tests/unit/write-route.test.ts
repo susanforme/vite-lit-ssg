@@ -4,26 +4,26 @@ import { join } from 'node:path'
 
 describe('resolveRouteFilePath', () => {
   it('maps / to dist/index.html', () => {
-    expect(resolveRouteFilePath('/', '/project/dist')).toBe(
-      join('/project/dist', 'index.html'),
+    expect(resolveRouteFilePath('/', '/project/temp/dist')).toBe(
+      join('/project/temp/dist', 'index.html'),
     )
   })
 
   it('maps /about to dist/about/index.html', () => {
-    expect(resolveRouteFilePath('/about', '/project/dist')).toBe(
-      join('/project/dist', 'about', 'index.html'),
+    expect(resolveRouteFilePath('/about', '/project/temp/dist')).toBe(
+      join('/project/temp/dist', 'about', 'index.html'),
     )
   })
 
   it('maps /blog/post to dist/blog/post/index.html', () => {
-    expect(resolveRouteFilePath('/blog/post', '/project/dist')).toBe(
-      join('/project/dist', 'blog', 'post', 'index.html'),
+    expect(resolveRouteFilePath('/blog/post', '/project/temp/dist')).toBe(
+      join('/project/temp/dist', 'blog', 'post', 'index.html'),
     )
   })
 
   it('handles trailing slash in route', () => {
-    expect(resolveRouteFilePath('/about/', '/project/dist')).toBe(
-      join('/project/dist', 'about', 'index.html'),
+    expect(resolveRouteFilePath('/about/', '/project/temp/dist')).toBe(
+      join('/project/temp/dist', 'about', 'index.html'),
     )
   })
 })

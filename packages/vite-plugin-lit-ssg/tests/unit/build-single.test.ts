@@ -20,8 +20,8 @@ describe('build-single: manifest key selection', () => {
 
 describe('build-single: root output path', () => {
   it('root route resolves to dist/index.html', () => {
-    const filePath = resolveRouteFilePath('/', '/project/dist')
-    expect(filePath).toBe('/project/dist/index.html')
+    const filePath = resolveRouteFilePath('/', '/project/temp/dist')
+    expect(filePath).toBe('/project/temp/dist/index.html')
   })
 
   it('single-component always uses route "/" for output', () => {

@@ -5,6 +5,6 @@ export default defineConfig({
   base: './',
   plugins: [litSSG()],
   build: {
-    outDir: 'temp/dist-convention-test',
+    outDir: 'temp/dist-flat-assets-test',
   },
 })

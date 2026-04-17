@@ -194,27 +194,17 @@ export default defineConfig({
 })
 ```
 
-**Output** — a single `dist/index.html`:
+**Output** — a single `dist/index.html` (wrapper-only fragment, no HTML shell, no scripts):
 
 ```html
-<!doctype html>
-<html>
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- asset links per preload policy -->
-  </head>
-  <body dsd-pending>
-    <!-- DSD scripts -->
-    <my-app>
-      <my-widget>
-        <template shadowrootmode="open"><!-- SSR content --></template>
-      </my-widget>
-    </my-app>
-    <script type="module" src="/assets/lit-ssg-single-...js"></script>
-  </body>
-</html>
+<my-app>
+  <my-widget>
+    <template shadowrootmode="open"><!-- SSR content --></template>
+  </my-widget>
+</my-app>
 ```
+
+The output is a pure SSR component fragment — no `<!doctype>`, no `<html>`, no `<script>` tags. You embed this directly into your existing page.
 
 **Important:** Page-level APIs (`title`, `meta`, `lang`, `head`, `htmlAttrs`, `bodyAttrs`) are **not** supported in single-component mode. If you need page metadata, use page mode instead.
 

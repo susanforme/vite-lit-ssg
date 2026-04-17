@@ -3,17 +3,14 @@ import { join, resolve } from 'node:path'
 import { build } from 'vite'
 import type { ResolvedSingleComponentOptions } from '../types.js'
 import { loadServerEntry } from './load-server-entry.js'
-import { readManifest, resolveAssetsFromManifest } from '../assets/manifest.js'
 import { renderComponent } from '../runtime/render-component.js'
 import { resolveRouteFilePath, writeRoute } from '../output/write-route.js'
-import { VIRTUAL_SINGLE_CLIENT_ID, VIRTUAL_SINGLE_SERVER_ID } from '../plugin/index.js'
+import { VIRTUAL_SINGLE_SERVER_ID } from '../plugin/index.js'
 import type { BuildContext } from './build.js'
 
-const SERVER_BUILD_PARENT = '.vite-ssg'
 const SERVER_BUILD_DIR_NAME = '.vite-ssg/server'
+const SERVER_BUILD_PARENT = '.vite-ssg'
 const SERVER_ENTRY_FILENAME = 'entry-server.js'
-
-const SINGLE_CLIENT_MANIFEST_KEY = VIRTUAL_SINGLE_CLIENT_ID
 
 export async function runSingleSSG(
   opts: ResolvedSingleComponentOptions,
@@ -33,20 +30,6 @@ export async function runSingleSSG(
     ...(ctx.configFile !== undefined ? { configFile: ctx.configFile } : {}),
     logLevel: 'warn' as const,
   }
-
-  console.log('[vite-lit-ssg] Starting client build (single-component)...')
-  await build({
-    ...sharedBuildConfig,
-    build: {
-      outDir: resolvedOutDir,
-      manifest: true,
-      rollupOptions: {
-        input: {
-          'lit-ssg-single': VIRTUAL_SINGLE_CLIENT_ID,
-        },
-      },
-    },
-  })
 
   console.log('[vite-lit-ssg] Starting server build (single-component)...')
 
@@ -69,9 +52,6 @@ export async function runSingleSSG(
     console.log('[vite-lit-ssg] Loading server entry...')
     const serverEntry = await loadServerEntry(join(serverBuildDir, SERVER_ENTRY_FILENAME))
 
-    console.log('[vite-lit-ssg] Reading manifest...')
-    const manifest = await readManifest(resolvedOutDir)
-
     console.log('[vite-lit-ssg] Rendering single-component route...')
     const renderResult = await serverEntry.render('/', { route: '/', params: {} })
 
@@ -79,8 +59,7 @@ export async function runSingleSSG(
       throw new Error('[vite-plugin-lit-ssg] single-component render returned null — component may not be registered')
     }
 
-    const assets = resolveAssetsFromManifest(manifest, base, 0, SINGLE_CLIENT_MANIFEST_KEY)
-    const html = await renderComponent(renderResult, assets, opts.wrapperTag, opts.preload)
+    const html = await renderComponent(renderResult, opts.wrapperTag)
 
     const filePath = resolveRouteFilePath('/', resolvedOutDir)
     await writeRoute(filePath, html)

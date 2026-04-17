@@ -4,11 +4,12 @@ import { readdirSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const PLAYGROUND_ROOT = resolve(import.meta.dirname, '../../../playground')
-const DIST_ASSETS = join(PLAYGROUND_ROOT, 'dist', 'assets')
+const DIST_ROOT = join(PLAYGROUND_ROOT, 'temp', 'dist-flat-assets-test')
+const DIST_ASSETS = join(DIST_ROOT, 'assets')
 
 describe('flat asset output', () => {
   beforeAll(() => {
-    execSync('pnpm build', { cwd: PLAYGROUND_ROOT, stdio: 'pipe' })
+    execSync('pnpm vite-lit-ssg build --config vite.config.flat-assets-test.ts', { cwd: PLAYGROUND_ROOT, stdio: 'pipe' })
   }, 120_000)
 
   it('assets directory exists', () => {
@@ -42,7 +43,7 @@ describe('flat asset output', () => {
   })
 
   it('about html references flat asset path', () => {
-    const html = require('node:fs').readFileSync(join(PLAYGROUND_ROOT, 'dist', 'about', 'index.html'), 'utf-8')
+    const html = require('node:fs').readFileSync(join(DIST_ROOT, 'about', 'index.html'), 'utf-8')
     expect(html).not.toContain('assets/lit-ssg-page/')
     expect(html).toMatch(/assets\/about-[^/]+\.js/)
   })

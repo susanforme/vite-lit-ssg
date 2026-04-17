@@ -9,6 +9,6 @@ export default defineConfig({
     preload: 'none',
   })],
   build: {
-    outDir: 'dist-test-none',
+    outDir: 'temp/dist-test-none',
   },
 })

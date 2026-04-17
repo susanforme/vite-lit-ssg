@@ -9,6 +9,6 @@ export default defineConfig({
     preload: 'entry-only',
   })],
   build: {
-    outDir: 'dist-test-entry-only',
+    outDir: 'temp/dist-test-entry-only',
   },
 })

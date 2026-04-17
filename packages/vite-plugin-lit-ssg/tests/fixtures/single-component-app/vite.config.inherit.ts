@@ -9,6 +9,6 @@ export default defineConfig({
     preload: 'inherit',
   })],
   build: {
-    outDir: 'dist-test-inherit',
+    outDir: 'temp/dist-test-inherit',
   },
 })
