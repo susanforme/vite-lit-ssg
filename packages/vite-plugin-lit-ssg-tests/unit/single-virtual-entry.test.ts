@@ -36,9 +36,9 @@ describe('generateSingleClientEntry', () => {
 })
 
 describe('generateSingleDevEntry', () => {
-  it('imports hydration support', () => {
+  it('does not import hydration support in dev mode', () => {
     const result = generateSingleDevEntry(defaultOpts)
-    expect(result).toContain('@lit-labs/ssr-client/lit-element-hydrate-support.js')
+    expect(result).not.toContain('@lit-labs/ssr-client/lit-element-hydrate-support.js')
   })
 
   it('uses default import for default export', () => {

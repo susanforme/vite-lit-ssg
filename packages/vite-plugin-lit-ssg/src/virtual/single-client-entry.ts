@@ -19,8 +19,8 @@ export function generateSingleDevEntry(opts: ResolvedSingleComponentOptions): st
 
   const wrapperTag = typeof opts.wrapperTag === 'function' ? opts.wrapperTag() : opts.wrapperTag
 
-  return `${HYDRATE_SUPPORT_IMPORT}
-${exportClause}
+  // Dev mode: no hydrate-support import — component renders fresh (no SSR output to hydrate)
+  return `${exportClause}
 const tag = customElements.getName(componentExport)
 if (tag) {
   const wrapper = document.createElement('${wrapperTag}')
