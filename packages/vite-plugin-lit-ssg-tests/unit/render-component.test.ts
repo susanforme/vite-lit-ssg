@@ -193,6 +193,23 @@ describe('renderComponent — injectPolyfill option', () => {
     expect(result).not.toContain('document.body.removeAttribute')
   })
 
+  it('native-check script is guarded by shadowRootMode check, not unconditional', async () => {
+    const result = await renderComponent(template, 'my-widget', undefined, { injectPolyfill: true, dsdPendingStyle: true })
+    const scripts = result.match(/<script[^>]*>[\s\S]*?<\/script>/g) ?? []
+    const syncScripts = scripts.filter(s => !s.includes('type="module"'))
+    const nativeCheckScript = syncScripts[0] ?? ''
+    expect(nativeCheckScript).toContain("shadowRootMode")
+    expect(nativeCheckScript).not.toMatch(/^<script>var __w/)
+  })
+
+  it('on non-native browsers polyfill script still finds wrapper via [dsd-pending] selector', async () => {
+    const result = await renderComponent(template, 'my-app', undefined, { injectPolyfill: true, dsdPendingStyle: true })
+    const moduleScript = result.match(/<script type="module">[\s\S]*?<\/script>/g)?.[0] ?? ''
+    expect(moduleScript).toContain("querySelector('my-app[dsd-pending]')")
+    expect(moduleScript).toContain('hydrateShadowRoots')
+    expect(moduleScript).toContain("removeAttribute('dsd-pending')")
+  })
+
   it('injectPolyfill=true still appends asset tags inside wrapper', async () => {
     const result = await renderComponent(template, 'my-app-root', syntheticAssets, { injectPolyfill: true })
     const wrapperStart = result.indexOf('<my-app-root')

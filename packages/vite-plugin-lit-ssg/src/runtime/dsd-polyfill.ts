@@ -24,8 +24,8 @@ export async function buildDsdPolyfillScriptsForWrapper(wrapperTag: string, hasD
 
   if (hasDsdPendingAttr) {
     const pendingSel = `document.querySelector('${wrapperTag}[dsd-pending]')`
-    const nativeCheckScript = `  <script>var __w=document.querySelector('${wrapperTag}[dsd-pending]');if(__w)__w.removeAttribute('dsd-pending')</script>`
-    const polyfillHydrateScript = `  <script type="module">var __w=${pendingSel};if(__w&&!('shadowRootMode'in HTMLTemplateElement.prototype)){TemplateShadowRoot.hydrateShadowRoots(__w);__w.removeAttribute('dsd-pending')}else if(__w){__w.removeAttribute('dsd-pending')}</script>`
+    const nativeCheckScript = `  <script>if('shadowRootMode'in HTMLTemplateElement.prototype){var __w=${pendingSel};if(__w)__w.removeAttribute('dsd-pending')}</script>`
+    const polyfillHydrateScript = `  <script type="module">if(!('shadowRootMode'in HTMLTemplateElement.prototype)){var __w=${pendingSel};if(__w){TemplateShadowRoot.hydrateShadowRoots(__w);__w.removeAttribute('dsd-pending')}}</script>`
     return `${nativeCheckScript}\n${polyfillDefineScript}\n${polyfillHydrateScript}`
   }
 
