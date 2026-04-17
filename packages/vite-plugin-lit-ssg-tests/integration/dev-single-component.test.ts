@@ -45,6 +45,14 @@ describe('single-component dev mode — HTML shell (base=/)', () => {
     const html = await res.text()
     expect(html).toContain('type="module"')
   })
+
+  it('serves transformed entry module without raw decorator syntax', async () => {
+    const res = await fetch(`http://localhost:${port}/src/demo-widget.ts`)
+    expect(res.status).toBe(200)
+    const moduleCode = await res.text()
+    expect(moduleCode).not.toContain('@customElement(')
+    expect(moduleCode).toContain('demo-widget')
+  })
 })
 
 describe('single-component dev mode — HTML shell (base=/demo/)', () => {

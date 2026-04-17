@@ -77,6 +77,13 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         build: {
           manifest: true,
         },
+        esbuild: {
+          tsconfigRaw: {
+            compilerOptions: {
+              experimentalDecorators: true,
+            },
+          },
+        },
         resolve: {
           alias: {
             '@lit-labs/ssr-client/lit-element-hydrate-support.js': browserHydratePath,
