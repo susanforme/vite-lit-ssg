@@ -78,7 +78,11 @@ export async function runSingleSSG(
     const manifest = await readManifest(resolvedOutDir)
     const assets = resolveAssetsFromManifest(manifest, base, 0, VIRTUAL_SINGLE_CLIENT_ID)
 
-    const html = await renderComponent(renderResult, opts.wrapperTag, assets, opts.preload)
+    const html = await renderComponent(renderResult, opts.wrapperTag, assets, {
+      preload: opts.preload,
+      injectPolyfill: opts.injectPolyfill,
+      dsdPendingStyle: opts.dsdPendingStyle,
+    })
 
     const filePath = resolveRouteFilePath('/', resolvedOutDir)
     await writeRoute(filePath, html)

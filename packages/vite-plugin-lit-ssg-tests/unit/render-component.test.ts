@@ -144,3 +144,69 @@ describe('renderComponent — wrapperTag as function', () => {
     expect(result).toContain('<script type="module" src="/assets/entry.js">')
   })
 })
+
+describe('renderComponent — injectPolyfill option', () => {
+  it('does not inject polyfill by default', async () => {
+    const result = await renderComponent(template, 'my-app-root')
+    expect(result).not.toContain('shadowRootMode')
+    expect(result).not.toContain('dsd-pending')
+    expect(result.trim()).toMatch(/^<my-app-root>[\s\S]*<\/my-app-root>$/)
+  })
+
+  it('injectPolyfill=false produces same result as default', async () => {
+    const def = await renderComponent(template, 'my-app-root')
+    const explicit = await renderComponent(template, 'my-app-root', undefined, { injectPolyfill: false })
+    expect(explicit).toBe(def)
+  })
+
+  it('injectPolyfill=true appends polyfill scripts after wrapper', async () => {
+    const result = await renderComponent(template, 'my-app-root', undefined, { injectPolyfill: true })
+    expect(result).toContain('shadowRootMode')
+    const wrapperEnd = result.indexOf('</my-app-root>')
+    const polyfillIdx = result.indexOf('shadowRootMode', wrapperEnd)
+    expect(polyfillIdx).toBeGreaterThan(wrapperEnd)
+  })
+
+  it('injectPolyfill=true with dsdPendingStyle=true adds dsd-pending attribute and style', async () => {
+    const result = await renderComponent(template, 'my-app-root', undefined, { injectPolyfill: true, dsdPendingStyle: true })
+    expect(result).toContain('my-app-root[dsd-pending]{display:none}')
+    expect(result).toContain('<my-app-root dsd-pending>')
+  })
+
+  it('injectPolyfill=true dsdPendingStyle defaults to true', async () => {
+    const withDefault = await renderComponent(template, 'my-app-root', undefined, { injectPolyfill: true })
+    const withExplicit = await renderComponent(template, 'my-app-root', undefined, { injectPolyfill: true, dsdPendingStyle: true })
+    expect(withDefault).toBe(withExplicit)
+  })
+
+  it('injectPolyfill=true dsdPendingStyle=false omits pending style and attribute', async () => {
+    const result = await renderComponent(template, 'my-app-root', undefined, { injectPolyfill: true, dsdPendingStyle: false })
+    expect(result).not.toContain('my-app-root[dsd-pending]')
+    expect(result).not.toContain('<my-app-root dsd-pending>')
+    expect(result).toContain('<my-app-root>')
+    expect(result).toContain('shadowRootMode')
+  })
+
+  it('polyfill targets the wrapper tag selector, not document.body', async () => {
+    const result = await renderComponent(template, 'my-widget', undefined, { injectPolyfill: true })
+    expect(result).toContain("querySelector('my-widget')")
+    expect(result).not.toContain('document.body.removeAttribute')
+  })
+
+  it('injectPolyfill=true still appends asset tags inside wrapper', async () => {
+    const result = await renderComponent(template, 'my-app-root', syntheticAssets, { injectPolyfill: true })
+    const wrapperStart = result.indexOf('<my-app-root')
+    const wrapperEnd = result.indexOf('</my-app-root>')
+    const scriptInWrapper = result.indexOf('<script type="module" src="/assets/entry.js">')
+    expect(scriptInWrapper).toBeGreaterThan(wrapperStart)
+    expect(scriptInWrapper).toBeLessThan(wrapperEnd)
+  })
+})
+
+describe('renderComponent — options object form (backward compat)', () => {
+  it('accepts options object with preload field', async () => {
+    const fromStr = await renderComponent(template, 'my-app-root', syntheticAssets, 'none')
+    const fromObj = await renderComponent(template, 'my-app-root', syntheticAssets, { preload: 'none' })
+    expect(fromObj).toBe(fromStr)
+  })
+})

@@ -2,13 +2,27 @@ import { render } from '@lit-labs/ssr'
 import { collectResult } from '@lit-labs/ssr/lib/render-result.js'
 import type { AssetLinks, PageRenderResult, PreloadPolicy } from '../types.js'
 import { normalizePage } from './normalize-page.js'
+import { buildDsdPolyfillScriptsForWrapper } from './dsd-polyfill.js'
+
+export interface RenderComponentOptions {
+  preload?: PreloadPolicy
+  injectPolyfill?: boolean
+  dsdPendingStyle?: boolean
+}
 
 export async function renderComponent(
   result: PageRenderResult,
   wrapperTag: string | (() => string),
   assets?: AssetLinks,
-  preload: PreloadPolicy = 'inherit',
+  preloadOrOpts: PreloadPolicy | RenderComponentOptions = 'inherit',
 ): Promise<string> {
+  const opts: RenderComponentOptions = typeof preloadOrOpts === 'string'
+    ? { preload: preloadOrOpts }
+    : preloadOrOpts
+  const preload = opts.preload ?? 'inherit'
+  const injectPolyfill = opts.injectPolyfill ?? false
+  const dsdPendingStyle = opts.dsdPendingStyle ?? injectPolyfill
+
   const page = normalizePage(result)
   const tag = typeof wrapperTag === 'function' ? wrapperTag() : wrapperTag
 
@@ -17,29 +31,34 @@ export async function renderComponent(
     componentHtml = await collectResult(render(page.template))
   }
 
-  if (!assets) {
-    return `<${tag}>${componentHtml}</${tag}>`
-  }
+  const wrapperOpenTag = injectPolyfill && dsdPendingStyle ? `<${tag} dsd-pending>` : `<${tag}>`
+  const pendingStyleTag = injectPolyfill && dsdPendingStyle ? `<style>${tag}[dsd-pending]{display:none}</style>` : ''
 
   const assetTags: string[] = []
 
-  if (preload !== 'entry-only') {
-    for (const href of assets.css) {
-      assetTags.push(`<link rel="stylesheet" href="${href}">`)
+  if (assets) {
+    if (preload !== 'entry-only') {
+      for (const href of assets.css) {
+        assetTags.push(`<link rel="stylesheet" href="${href}">`)
+      }
     }
+
+    if (preload === 'inherit') {
+      for (const href of assets.modulepreloads) {
+        assetTags.push(`<link rel="modulepreload" href="${href}">`)
+      }
+    }
+
+    assetTags.push(`<script type="module" src="${assets.js}"></script>`)
   }
 
-  if (preload === 'inherit') {
-    for (const href of assets.modulepreloads) {
-      assetTags.push(`<link rel="modulepreload" href="${href}">`)
-    }
+  const inner = assetTags.length > 0 ? `${componentHtml}\n${assetTags.join('\n')}` : componentHtml
+  const wrapperHtml = `${wrapperOpenTag}${inner}</${tag}>`
+
+  if (!injectPolyfill) {
+    return wrapperHtml
   }
 
-  assetTags.push(`<script type="module" src="${assets.js}"></script>`)
-
-  const inner = assetTags.length > 0
-    ? `${componentHtml}\n${assetTags.join('\n')}`
-    : componentHtml
-
-  return `<${tag}>${inner}</${tag}>`
+  const polyfillScripts = await buildDsdPolyfillScriptsForWrapper(tag)
+  return [pendingStyleTag, wrapperHtml, polyfillScripts].filter(Boolean).join('\n')
 }

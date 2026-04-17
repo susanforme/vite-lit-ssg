@@ -74,12 +74,49 @@ describe('resolveSingleComponentOptions', () => {
     expect(resolved.preload).toBe('entry-only')
   })
 
-  it('preserves the entry path', () => {
+  it('applies default injectPolyfill (false)', () => {
     const resolved = resolveSingleComponentOptions({
       mode: 'single-component',
       entry: 'src/components/my-element.ts',
     })
-    expect(resolved.entry).toBe('src/components/my-element.ts')
+    expect(resolved.injectPolyfill).toBe(false)
+  })
+
+  it('applies default dsdPendingStyle (false when injectPolyfill is false)', () => {
+    const resolved = resolveSingleComponentOptions({
+      mode: 'single-component',
+      entry: 'src/components/my-element.ts',
+    })
+    expect(resolved.dsdPendingStyle).toBe(false)
+  })
+
+  it('dsdPendingStyle defaults to true when injectPolyfill is true', () => {
+    const resolved = resolveSingleComponentOptions({
+      mode: 'single-component',
+      entry: 'src/components/my-element.ts',
+      injectPolyfill: true,
+    })
+    expect(resolved.injectPolyfill).toBe(true)
+    expect(resolved.dsdPendingStyle).toBe(true)
+  })
+
+  it('preserves explicit injectPolyfill=true', () => {
+    const resolved = resolveSingleComponentOptions({
+      mode: 'single-component',
+      entry: 'src/components/my-element.ts',
+      injectPolyfill: true,
+    })
+    expect(resolved.injectPolyfill).toBe(true)
+  })
+
+  it('preserves explicit dsdPendingStyle=false even when injectPolyfill=true', () => {
+    const resolved = resolveSingleComponentOptions({
+      mode: 'single-component',
+      entry: 'src/components/my-element.ts',
+      injectPolyfill: true,
+      dsdPendingStyle: false,
+    })
+    expect(resolved.dsdPendingStyle).toBe(false)
   })
 })
 

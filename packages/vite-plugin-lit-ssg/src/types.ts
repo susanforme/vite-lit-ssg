@@ -130,6 +130,17 @@ export interface SingleComponentOptions {
   wrapperTag?: string | (() => string)
   /** Preload strategy. Defaults to 'inherit'. */
   preload?: PreloadPolicy
+  /**
+   * Whether to inject the Declarative Shadow DOM polyfill scripts into the output.
+   * Defaults to `false`. When `true`, polyfill scripts are appended after the wrapper tag.
+   */
+  injectPolyfill?: boolean
+  /**
+   * Whether to inject a `<style>wrapper-tag[dsd-pending]{display:none}</style>` rule and
+   * add the `dsd-pending` attribute to the wrapper element.
+   * Only effective when `injectPolyfill` is `true`. Defaults to `true` when injectPolyfill is true.
+   */
+  dsdPendingStyle?: boolean
 }
 
 export type LitSSGOptionsNew = PageModeOptions | SingleComponentOptions
@@ -140,14 +151,19 @@ export interface ResolvedSingleComponentOptions {
   exportName: string
   wrapperTag: string | (() => string)
   preload: PreloadPolicy
+  injectPolyfill: boolean
+  dsdPendingStyle: boolean
 }
 
 export function resolveSingleComponentOptions(opts: SingleComponentOptions): ResolvedSingleComponentOptions {
+  const injectPolyfill = opts.injectPolyfill ?? false
   return {
     mode: 'single-component',
     entry: opts.entry,
     exportName: opts.exportName ?? 'default',
     wrapperTag: opts.wrapperTag ?? 'lit-ssg-root',
     preload: opts.preload ?? 'inherit',
+    injectPolyfill,
+    dsdPendingStyle: opts.dsdPendingStyle ?? injectPolyfill,
   }
 }

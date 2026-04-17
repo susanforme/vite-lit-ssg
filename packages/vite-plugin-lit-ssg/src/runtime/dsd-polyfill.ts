@@ -14,3 +14,16 @@ export async function buildDsdPolyfillScripts(): Promise<string> {
 
   return `${nativeCheckScript}\n${polyfillDefineScript}\n${polyfillHydrateScript}`
 }
+
+export async function buildDsdPolyfillScriptsForWrapper(wrapperTag: string): Promise<string> {
+  const pkgPath = _require.resolve('@webcomponents/template-shadowroot/template-shadowroot.min.js')
+  const polyfillSource = await readFile(pkgPath, 'utf-8')
+  const cleanSource = polyfillSource.replace(/\/\/# sourceMappingURL=.*$/m, '').trimEnd()
+
+  const sel = `document.querySelector('${wrapperTag}')`
+  const nativeCheckScript = `  <script>if('shadowRootMode'in HTMLTemplateElement.prototype){${sel}.removeAttribute('dsd-pending')}</script>`
+  const polyfillDefineScript = `  <script>if(!('shadowRootMode'in HTMLTemplateElement.prototype)){${cleanSource}}</script>`
+  const polyfillHydrateScript = `  <script type="module">if(!('shadowRootMode'in HTMLTemplateElement.prototype)){TemplateShadowRoot.hydrateShadowRoots(${sel});${sel}.removeAttribute('dsd-pending')}else{${sel}.removeAttribute('dsd-pending')}</script>`
+
+  return `${nativeCheckScript}\n${polyfillDefineScript}\n${polyfillHydrateScript}`
+}
