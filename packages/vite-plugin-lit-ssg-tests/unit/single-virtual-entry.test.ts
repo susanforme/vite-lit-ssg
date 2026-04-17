@@ -9,6 +9,8 @@ const defaultOpts: ResolvedSingleComponentOptions = {
   exportName: 'default',
   wrapperTag: 'lit-ssg-root',
   preload: 'inherit',
+  injectPolyfill: false,
+  dsdPendingStyle: false,
 }
 
 const namedExportOpts: ResolvedSingleComponentOptions = {
@@ -50,16 +52,16 @@ describe('generateSingleDevEntry', () => {
     expect(result).toContain('import { MyElement as componentExport }')
   })
 
-  it('appends component to body using customElements.getName', () => {
+  it('appends wrapper containing component to body', () => {
     const result = generateSingleDevEntry(defaultOpts)
     expect(result).toContain('customElements.getName(componentExport)')
     expect(result).toContain('document.body.appendChild')
+    expect(result).toContain('wrapper')
   })
 
-  it('does not inject wrapper markup', () => {
+  it('creates wrapper element using configured wrapperTag', () => {
     const result = generateSingleDevEntry(defaultOpts)
-    expect(result).not.toContain('lit-ssg-root')
-    expect(result).not.toContain('wrapper')
+    expect(result).toContain("document.createElement('lit-ssg-root')")
   })
 })
 

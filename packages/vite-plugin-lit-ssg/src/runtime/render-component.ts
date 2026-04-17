@@ -59,6 +59,6 @@ export async function renderComponent(
     return wrapperHtml
   }
 
-  const polyfillScripts = await buildDsdPolyfillScriptsForWrapper(tag)
+  const polyfillScripts = await buildDsdPolyfillScriptsForWrapper(tag, dsdPendingStyle)
   return [pendingStyleTag, wrapperHtml, polyfillScripts].filter(Boolean).join('\n')
 }

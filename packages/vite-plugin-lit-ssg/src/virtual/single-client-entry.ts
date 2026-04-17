@@ -17,12 +17,16 @@ export function generateSingleDevEntry(opts: ResolvedSingleComponentOptions): st
     ? `import componentExport from '${entryPath}'`
     : `import { ${opts.exportName} as componentExport } from '${entryPath}'`
 
+  const wrapperTag = typeof opts.wrapperTag === 'function' ? opts.wrapperTag() : opts.wrapperTag
+
   return `${HYDRATE_SUPPORT_IMPORT}
 ${exportClause}
 const tag = customElements.getName(componentExport)
 if (tag) {
+  const wrapper = document.createElement('${wrapperTag}')
   const el = document.createElement(tag)
-  document.body.appendChild(el)
+  wrapper.appendChild(el)
+  document.body.appendChild(wrapper)
 } else {
   console.error('[vite-plugin-lit-ssg] Component export "${opts.exportName}" from "${opts.entry}" is not registered as a custom element. Make sure to use @customElement decorator.')
 }

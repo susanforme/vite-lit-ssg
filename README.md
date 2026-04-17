@@ -167,6 +167,8 @@ litSSG({
   exportName?: string,   // default: 'default'
   wrapperTag?: string,   // default: 'lit-ssg-root'
   preload?: 'inherit' | 'none' | 'entry-only',  // default: 'inherit'
+  injectPolyfill?: boolean,  // default: false
+  dsdPendingStyle?: boolean, // default: true (when injectPolyfill is true)
 })
 ```
 
@@ -177,6 +179,8 @@ litSSG({
 | `exportName` | `string` | `'default'` | Named export to use as the component class |
 | `wrapperTag` | `string` | `'lit-ssg-root'` | Custom element tag that wraps the SSR output |
 | `preload` | `string` | `'inherit'` | Controls `<link rel="modulepreload">` injection: `inherit` = keep all preloads, `none` = remove all modulepreload links (CSS kept), `entry-only` = keep only the entry script (no CSS/preload links) |
+| `injectPolyfill` | `boolean` | `false` | Inject Declarative Shadow DOM polyfill scripts into the fragment output. Useful when embedding into pages that may not support native DSD. |
+| `dsdPendingStyle` | `boolean` | `true` (when `injectPolyfill` is `true`) | Inject `<style>wrapper-tag[dsd-pending]{display:none}</style>` and add the `dsd-pending` attribute to the wrapper to prevent FOUC. Only relevant when `injectPolyfill` is `true`. |
 
 **Example:**
 

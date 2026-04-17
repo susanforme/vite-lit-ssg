@@ -189,7 +189,7 @@ describe('renderComponent — injectPolyfill option', () => {
 
   it('polyfill targets the wrapper tag selector, not document.body', async () => {
     const result = await renderComponent(template, 'my-widget', undefined, { injectPolyfill: true })
-    expect(result).toContain("querySelector('my-widget')")
+    expect(result).toContain("querySelector('my-widget[dsd-pending]')")
     expect(result).not.toContain('document.body.removeAttribute')
   })
 
