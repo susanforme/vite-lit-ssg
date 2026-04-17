@@ -2,15 +2,14 @@ import { render } from '@lit-labs/ssr'
 import { collectResult } from '@lit-labs/ssr/lib/render-result.js'
 import type { AssetLinks, PageRenderResult } from '../types.js'
 import { normalizePage } from './normalize-page.js'
+import { buildDsdPolyfillScripts } from './dsd-polyfill.js'
 
 const DSD_PENDING_STYLE = `  <style>body[dsd-pending]{display:none}</style>`
-
-const DSD_POLYFILL_SCRIPTS = `  <script>if('shadowrootmode'in HTMLTemplateElement.prototype){document.body.removeAttribute('dsd-pending')}</script>
-  <script type="module">if(!('shadowrootmode'in HTMLTemplateElement.prototype)){const{hydrateShadowRoots}=await import('https://unpkg.com/@webcomponents/template-shadowroot@0.2.1/template-shadowroot.js');hydrateShadowRoots(document.body);document.body.removeAttribute('dsd-pending')}</script>`
 
 export async function renderPage(
   result: PageRenderResult,
   assets: AssetLinks,
+  injectPolyfill = true,
 ): Promise<string> {
   const page = normalizePage(result)
 
@@ -45,9 +44,20 @@ export async function renderPage(
 
   const titleTag = title ? `  <title>${escapeHtml(title)}</title>` : ''
 
-  const headParts = [titleTag, metaTagsStr, cssLinks, preloadLinks, DSD_PENDING_STYLE, extraHeadStr]
+  const headParts = [
+    titleTag,
+    metaTagsStr,
+    cssLinks,
+    preloadLinks,
+    injectPolyfill ? DSD_PENDING_STYLE : '',
+    extraHeadStr,
+  ]
     .filter(Boolean)
     .join('\n')
+
+  const dsdPolyfillScripts = injectPolyfill ? await buildDsdPolyfillScripts() : ''
+
+  const bodyOpenTag = injectPolyfill ? `<body dsd-pending${bodyAttrStr}>` : `<body${bodyAttrStr}>`
 
   return [
     '<!doctype html>',
@@ -57,8 +67,8 @@ export async function renderPage(
     '  <meta name="viewport" content="width=device-width, initial-scale=1.0">',
     headParts,
     '</head>',
-    `<body dsd-pending${bodyAttrStr}>`,
-    DSD_POLYFILL_SCRIPTS,
+    bodyOpenTag,
+    ...(dsdPolyfillScripts ? [dsdPolyfillScripts] : []),
     appHtml,
     `  <script type="module" src="${assets.js}"></script>`,
     '</body>',

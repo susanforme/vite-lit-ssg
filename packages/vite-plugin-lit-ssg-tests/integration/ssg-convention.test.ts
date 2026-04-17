@@ -76,10 +76,10 @@ describe('SSG convention-based integration', () => {
 
   it('index.html has DSD feature-detection script', async () => {
     const content = await readFile(join(DIST_DIR, 'index.html'), 'utf-8')
-    expect(content).toContain("'shadowrootmode'in HTMLTemplateElement.prototype")
+    expect(content).toContain("'shadowRootMode'in HTMLTemplateElement.prototype")
   })
 
-  it('index.html has DSD polyfill async loader', async () => {
+  it('index.html has DSD polyfill inline script', async () => {
     const content = await readFile(join(DIST_DIR, 'index.html'), 'utf-8')
     expect(content).toContain('hydrateShadowRoots')
   })

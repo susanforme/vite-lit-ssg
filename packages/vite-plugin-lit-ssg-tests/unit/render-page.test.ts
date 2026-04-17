@@ -116,13 +116,30 @@ describe('renderPage', () => {
 
   it('has DSD feature-detection inline script', async () => {
     const html_str = await renderPage(null, baseAssets)
-    expect(html_str).toContain("'shadowrootmode'in HTMLTemplateElement.prototype")
+    expect(html_str).toContain("'shadowRootMode'in HTMLTemplateElement.prototype")
   })
 
-  it('has DSD polyfill async loader script', async () => {
+  it('has DSD polyfill inline script', async () => {
     const html_str = await renderPage(null, baseAssets)
     expect(html_str).toContain('hydrateShadowRoots')
-    expect(html_str).toContain('template-shadowroot')
+    expect(html_str).toContain('TemplateShadowRoot')
+  })
+
+  it('omits DSD polyfill when injectPolyfill is false', async () => {
+    const html_str = await renderPage(null, baseAssets, false)
+    expect(html_str).not.toContain('hydrateShadowRoots')
+    expect(html_str).not.toContain('TemplateShadowRoot')
+  })
+
+  it('omits dsd-pending body attribute when injectPolyfill is false', async () => {
+    const html_str = await renderPage(null, baseAssets, false)
+    expect(html_str).not.toContain('dsd-pending')
+    expect(html_str).toContain('<body>')
+  })
+
+  it('polyfill hydration call uses type=module for deferred execution', async () => {
+    const html_str = await renderPage(null, baseAssets)
+    expect(html_str).toContain('<script type="module">if(!(\'shadowRootMode\'in HTMLTemplateElement.prototype)')
   })
 
   it('dsd-pending and custom bodyAttrs coexist', async () => {

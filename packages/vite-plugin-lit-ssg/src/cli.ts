@@ -2,7 +2,7 @@
 import { resolve } from 'node:path'
 import { loadConfigFromFile } from 'vite'
 import type { Plugin } from 'vite'
-import { PLUGIN_NAME, getSSGOptions, getSingleComponentOptions } from './plugin/index.js'
+import { PLUGIN_NAME, getSSGOptions, getSingleComponentOptions, getPageInjectPolyfill } from './plugin/index.js'
 import { runSSG } from './runner/build.js'
 import { runSingleSSG } from './runner/build-single.js'
 import { scanPages } from './scanner/pages.js'
@@ -77,8 +77,9 @@ async function main(): Promise<void> {
   }
 
   const pages = await scanPages(projectRoot, ssgOpts)
+  const injectPolyfill = getPageInjectPolyfill(ssgPlugin)
 
-  await runSSG(pages, projectRoot, base, outDir, { mode, configFile: resolvedConfigFile })
+  await runSSG(pages, projectRoot, base, outDir, { mode, configFile: resolvedConfigFile }, injectPolyfill)
 }
 
 function getFlagValue(args: string[], flag: string): string | undefined {

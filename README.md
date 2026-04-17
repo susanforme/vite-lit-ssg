@@ -149,12 +149,14 @@ The component class must use the `@customElement` decorator — the tag name is 
 ```ts
 litSSG({
   pagesDir?: string  // default: 'src/pages'
+  injectPolyfill?: boolean  // default: true
 })
 ```
 
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `pagesDir` | `string` | `'src/pages'` | Directory to scan for page files |
+| `injectPolyfill` | `boolean` | `true` | Inject the Declarative Shadow DOM polyfill scripts. Set to `false` to omit polyfill injection when targeting environments with native DSD support only. |
 
 ### Single-Component Mode
 

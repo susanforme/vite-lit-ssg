@@ -31,6 +31,7 @@ interface PageModeState {
   scanOptions: ScanPagesOptions
   resolvedConfig: ResolvedConfig | null
   pages: PageEntry[]
+  injectPolyfill: boolean
 }
 
 interface SingleComponentState {
@@ -62,6 +63,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         : { pagesDir },
       resolvedConfig: null,
       pages: [],
+      injectPolyfill: options.injectPolyfill ?? true,
     }
   }
 
@@ -397,6 +399,12 @@ export function getSSGOptions(plugin: object): ScanPagesOptions | undefined {
   const state = pluginState.get(plugin)
   if (!state || state.kind !== 'page') return undefined
   return state.scanOptions
+}
+
+export function getPageInjectPolyfill(plugin: object): boolean {
+  const state = pluginState.get(plugin)
+  if (!state || state.kind !== 'page') return true
+  return state.injectPolyfill
 }
 
 export function getSingleComponentOptions(plugin: object): ResolvedSingleComponentOptions | undefined {

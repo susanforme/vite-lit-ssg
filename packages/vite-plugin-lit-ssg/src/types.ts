@@ -112,6 +112,12 @@ export interface PageModeOptions {
   mode?: 'page'
   pagesDir?: string
   ignore?: IgnoreOption | IgnoreOption[]
+  /**
+   * Whether to inject the Declarative Shadow DOM polyfill scripts into rendered HTML.
+   * Defaults to `true`. Set to `false` to omit polyfill injection (e.g. when targeting
+   * environments with native DSD support only).
+   */
+  injectPolyfill?: boolean
 }
 
 export interface SingleComponentOptions {

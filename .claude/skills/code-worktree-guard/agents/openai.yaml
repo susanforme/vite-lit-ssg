@@ -1,0 +1,9 @@
+interface:
+  display_name: Code Worktree Guard
+policy:
+  products:
+  - chatgpt
+  - codex
+  - api
+  - atlas
+  allow_implicit_invocation: true

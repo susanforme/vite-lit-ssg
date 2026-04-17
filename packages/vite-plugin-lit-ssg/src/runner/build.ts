@@ -61,6 +61,7 @@ export async function runSSG(
   base: string,
   outDir: string,
   ctx: BuildContext = { mode: 'production', configFile: undefined },
+  injectPolyfill = true,
 ): Promise<void> {
   const resolvedOutDir = resolve(projectRoot, outDir)
   const serverBuildDir = resolve(projectRoot, SERVER_BUILD_DIR_NAME)
@@ -131,7 +132,7 @@ export async function runSSG(
       const depth = routeDepth(route)
       const pageKey = routeToManifestKey.get(route)!
       const assets = resolveAssetsFromManifest(manifest, base, depth, pageKey)
-      const html = await renderPage(pageResult, assets)
+      const html = await renderPage(pageResult, assets, injectPolyfill)
 
       const filePath = resolveRouteFilePath(route, resolvedOutDir)
       await writeRoute(filePath, html)
