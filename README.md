@@ -194,7 +194,7 @@ export default defineConfig({
 })
 ```
 
-**Output** — a single `dist/index.html` (wrapper-only fragment, no HTML shell, no scripts):
+**Output** — a single `dist/index.html` (fragment with SSR markup and a client hydration script, no HTML shell):
 
 ```html
 <my-app>
@@ -202,15 +202,23 @@ export default defineConfig({
     <template shadowrootmode="open"><!-- SSR content --></template>
   </my-widget>
 </my-app>
+<script type="module" src="/assets/my-widget-abc123.js"></script>
 ```
 
-The output is a pure SSR component fragment — no `<!doctype>`, no `<html>`, no `<script>` tags. You embed this directly into your existing page.
+The output contains no `<!doctype>`, no `<html>`, no `<body>` — just the SSR fragment followed by the client module script for hydration. You embed this directly into your existing page.
+
+The `preload` option controls what asset tags are appended after the wrapper:
+- `inherit` (default) — CSS `<link>` tags + `<link rel="modulepreload">` hints + `<script type="module">`
+- `none` — CSS `<link>` tags + `<script type="module">` (no modulepreload hints)
+- `entry-only` — `<script type="module">` only (no CSS links, no modulepreload hints)
 
 **Important:** Page-level APIs (`title`, `meta`, `lang`, `head`, `htmlAttrs`, `bodyAttrs`) are **not** supported in single-component mode. If you need page metadata, use page mode instead.
 
 Plain `litSSG()` (no arguments) always means **page mode** and is fully backward compatible.
 
 ## How It Works
+
+### Page mode
 
 1. **Scan pages** — `src/pages/**/*.ts` files are discovered recursively and mapped to routes
 2. **Client build** — Vite builds client JS/CSS using a virtual entry that imports all page files
@@ -219,6 +227,15 @@ Plain `litSSG()` (no arguments) always means **page mode** and is fully backward
 5. **Inject assets** — JS/CSS links are resolved from the Vite manifest and injected into `<head>`
 6. **Write HTML** — Each route is written to `dist/<route>/index.html`
 7. **Cleanup** — Temporary server build artifacts are removed
+
+### Single-component mode
+
+1. **Client build** — Vite builds a client bundle from the component entry (includes Lit hydration support)
+2. **Server build** — Vite builds a Node.js SSR bundle for the component
+3. **Render** — The component is rendered using Lit SSR's `render()` + `collectResult()`, wrapped in `wrapperTag`
+4. **Inject assets** — JS/CSS/modulepreload tags are resolved from the manifest and appended after the wrapper (controlled by `preload` option)
+5. **Write HTML** — Output written to `dist/index.html` as an embeddable fragment
+6. **Cleanup** — Temporary server build artifacts are removed
 
 ## What This Is Not
 

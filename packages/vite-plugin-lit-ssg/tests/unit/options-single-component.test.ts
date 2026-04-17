@@ -36,13 +36,24 @@ describe('resolveSingleComponentOptions', () => {
     expect(resolved.exportName).toBe('MyElement')
   })
 
-  it('preserves explicit wrapperTag', () => {
+  it('preserves explicit wrapperTag as string', () => {
     const resolved = resolveSingleComponentOptions({
       mode: 'single-component',
       entry: 'src/components/my-element.ts',
       wrapperTag: 'my-app-root',
     })
     expect(resolved.wrapperTag).toBe('my-app-root')
+  })
+
+  it('preserves wrapperTag as function', () => {
+    const fn = () => 'dynamic-root'
+    const resolved = resolveSingleComponentOptions({
+      mode: 'single-component',
+      entry: 'src/components/my-element.ts',
+      wrapperTag: fn,
+    })
+    expect(resolved.wrapperTag).toBe(fn)
+    expect(typeof resolved.wrapperTag).toBe('function')
   })
 
   it('preserves preload=none', () => {

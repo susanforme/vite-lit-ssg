@@ -120,8 +120,8 @@ export interface SingleComponentOptions {
   entry: string
   /** Named export to use. Defaults to 'default'. */
   exportName?: string
-  /** Custom element tag to use as the wrapper. Defaults to 'lit-ssg-root'. */
-  wrapperTag?: string
+  /** Custom element tag to use as the wrapper. Can be a string or a zero-argument function returning a string. Defaults to 'lit-ssg-root'. */
+  wrapperTag?: string | (() => string)
   /** Preload strategy. Defaults to 'inherit'. */
   preload?: PreloadPolicy
 }
@@ -132,7 +132,7 @@ export interface ResolvedSingleComponentOptions {
   mode: 'single-component'
   entry: string
   exportName: string
-  wrapperTag: string
+  wrapperTag: string | (() => string)
   preload: PreloadPolicy
 }
 

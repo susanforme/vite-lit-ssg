@@ -1,8 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import { html } from 'lit'
 import { renderComponent } from '../../src/runtime/render-component.js'
+import type { AssetLinks } from '../../src/types.js'
 
 const template = html`<demo-widget></demo-widget>`
+
+const syntheticAssets: AssetLinks = {
+  js: '/assets/entry.js',
+  css: ['/assets/style.css'],
+  modulepreloads: ['/assets/chunk-a.js', '/assets/chunk-b.js'],
+}
 
 describe('renderComponent', () => {
   it('outputs only the wrapper tag — no HTML shell', async () => {
@@ -55,5 +62,85 @@ describe('renderComponent', () => {
     const result = await renderComponent(template, 'custom-shell')
     expect(result).toContain('<custom-shell>')
     expect(result).toContain('</custom-shell>')
+  })
+})
+
+describe('renderComponent with assets — preload policies', () => {
+  it('inherit: includes CSS, modulepreloads, and entry script — all inside wrapper', async () => {
+    const result = await renderComponent(template, 'my-app-root', syntheticAssets, 'inherit')
+    expect(result).toContain('<link rel="stylesheet" href="/assets/style.css">')
+    expect(result).toContain('<link rel="modulepreload" href="/assets/chunk-a.js">')
+    expect(result).toContain('<link rel="modulepreload" href="/assets/chunk-b.js">')
+    expect(result).toContain('<script type="module" src="/assets/entry.js">')
+    expect(result.trim()).toMatch(/^<my-app-root>[\s\S]*<\/my-app-root>$/)
+  })
+
+  it('none: includes CSS and entry script but no modulepreload hints — all inside wrapper', async () => {
+    const result = await renderComponent(template, 'my-app-root', syntheticAssets, 'none')
+    expect(result).toContain('<link rel="stylesheet" href="/assets/style.css">')
+    expect(result).not.toContain('<link rel="modulepreload"')
+    expect(result).toContain('<script type="module" src="/assets/entry.js">')
+    expect(result.trim()).toMatch(/^<my-app-root>[\s\S]*<\/my-app-root>$/)
+  })
+
+  it('entry-only: includes only entry script — inside wrapper, no CSS, no modulepreload hints', async () => {
+    const result = await renderComponent(template, 'my-app-root', syntheticAssets, 'entry-only')
+    expect(result).not.toContain('<link rel="stylesheet"')
+    expect(result).not.toContain('<link rel="modulepreload"')
+    expect(result).toContain('<script type="module" src="/assets/entry.js">')
+    expect(result.trim()).toMatch(/^<my-app-root>[\s\S]*<\/my-app-root>$/)
+  })
+
+  it('all policies: asset tags are inside wrapper (wrapper closes last)', async () => {
+    for (const preload of ['inherit', 'none', 'entry-only'] as const) {
+      const result = await renderComponent(template, 'my-app-root', syntheticAssets, preload)
+      expect(result.trim()).toMatch(/^<my-app-root>[\s\S]*<\/my-app-root>$/)
+      const scriptIdx = result.indexOf('<script type="module"')
+      const closingIdx = result.indexOf('</my-app-root>')
+      expect(scriptIdx).toBeGreaterThan(-1)
+      expect(closingIdx).toBeGreaterThan(scriptIdx)
+    }
+  })
+
+  it('all policies: no HTML shell emitted', async () => {
+    for (const preload of ['inherit', 'none', 'entry-only'] as const) {
+      const result = await renderComponent(template, 'my-app-root', syntheticAssets, preload)
+      expect(result).not.toContain('<!doctype')
+      expect(result).not.toContain('<html')
+      expect(result).not.toContain('<body')
+    }
+  })
+
+  it('default preload is inherit when assets provided', async () => {
+    const inherit = await renderComponent(template, 'my-app-root', syntheticAssets, 'inherit')
+    const defaulted = await renderComponent(template, 'my-app-root', syntheticAssets)
+    expect(defaulted).toBe(inherit)
+  })
+})
+
+describe('renderComponent — wrapperTag as function', () => {
+  it('calls the function to resolve the tag name', async () => {
+    const result = await renderComponent(template, () => 'dynamic-shell')
+    expect(result).toContain('<dynamic-shell>')
+    expect(result).toContain('</dynamic-shell>')
+  })
+
+  it('produces identical output to string form when function returns same tag', async () => {
+    const fromString = await renderComponent(template, 'my-app-root')
+    const fromFn = await renderComponent(template, () => 'my-app-root')
+    expect(fromFn).toBe(fromString)
+  })
+
+  it('calls the function once per render', async () => {
+    let calls = 0
+    const tag = () => { calls++; return 'counted-shell' }
+    await renderComponent(template, tag)
+    expect(calls).toBe(1)
+  })
+
+  it('respects assets when wrapperTag is a function', async () => {
+    const result = await renderComponent(template, () => 'fn-shell', syntheticAssets, 'entry-only')
+    expect(result.trim()).toMatch(/^<fn-shell>[\s\S]*<\/fn-shell>$/)
+    expect(result).toContain('<script type="module" src="/assets/entry.js">')
   })
 })
