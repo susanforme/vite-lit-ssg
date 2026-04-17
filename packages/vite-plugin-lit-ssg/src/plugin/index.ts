@@ -106,8 +106,11 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           if (req.method !== 'GET' && req.method !== 'HEAD') return next()
 
           const base = server.config.base ?? '/'
+          const isRootBase = base === '/' || base === ''
           const normalizedBase = base.endsWith('/') ? base : base + '/'
-          const isRoot = pathname === '/' || pathname === base.replace(/\/$/, '') || pathname === normalizedBase
+          const isRoot = isRootBase
+            ? pathname === '/'
+            : pathname === base.replace(/\/$/, '') || pathname === normalizedBase
           if (!isRoot) return next()
 
           const htmlTemplate = `<!DOCTYPE html>
