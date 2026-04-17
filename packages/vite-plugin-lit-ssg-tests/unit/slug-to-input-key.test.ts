@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { slugToInputKey, buildPageInputs } from '../../src/runner/build.js'
-import type { PageEntry } from '../../src/scanner/pages.js'
+import { slugToInputKey, buildPageInputs } from '../../vite-plugin-lit-ssg/src/runner/build.js'
+import type { PageEntry } from '../../vite-plugin-lit-ssg/src/scanner/pages.js'
 
 function makePage(slug: string, route: string): PageEntry {
   return { slug, route, filePath: `/src/pages/${slug}.ts`, importPath: `/src/pages/${slug}.ts` }

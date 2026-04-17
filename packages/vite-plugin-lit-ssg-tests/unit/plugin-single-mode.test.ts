@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { litSSG, getSingleComponentOptions, getSSGOptions } from '../../src/plugin/index.js'
+import { litSSG, getSingleComponentOptions, getSSGOptions } from '../../vite-plugin-lit-ssg/src/plugin/index.js'
 
 describe('plugin mode gating', () => {
   it('page-mode plugin has getSSGOptions set', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { litSSG, getSingleComponentOptions, getSSGOptions } from '../../src/plugin/index.js'
+import { litSSG, getSingleComponentOptions, getSSGOptions } from '../../vite-plugin-lit-ssg/src/plugin/index.js'
 
 describe('CLI mode dispatch logic', () => {
   it('getSingleComponentOptions returns options for single-component plugin', () => {

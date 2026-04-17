@@ -4,7 +4,7 @@ import { readFile, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 
-const PLAYGROUND_ROOT = resolve(import.meta.dirname, '../../../playground')
+const PLAYGROUND_ROOT = resolve(import.meta.dirname, '../../playground')
 const DIST_DIR = join(PLAYGROUND_ROOT, 'temp', 'dist-convention-test')
 
 describe('SSG convention-based integration', () => {

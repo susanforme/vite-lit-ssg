@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveRoutes } from '../../src/runner/routes.js'
+import { resolveRoutes } from '../../vite-plugin-lit-ssg/src/runner/routes.js'
 
 describe('resolveRoutes', () => {
   it('returns static array as-is', async () => {

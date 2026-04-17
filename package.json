@@ -7,8 +7,8 @@
     "build": "pnpm --filter vite-plugin-lit-ssg build",
     "dev": "pnpm --filter vite-plugin-lit-ssg dev",
     "typecheck": "pnpm --filter vite-plugin-lit-ssg typecheck",
-    "test": "pnpm --filter vite-plugin-lit-ssg test",
-    "test:watch": "pnpm --filter vite-plugin-lit-ssg test:watch",
+    "test": "pnpm --filter vite-plugin-lit-ssg-tests test",
+    "test:watch": "pnpm --filter vite-plugin-lit-ssg-tests test:watch",
     "playground:build": "pnpm --filter playground build",
     "playground:preview": "pnpm --filter playground preview"
   },

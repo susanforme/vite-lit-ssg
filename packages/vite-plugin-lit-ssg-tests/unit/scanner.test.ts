@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdir, writeFile, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { scanPages } from '../../src/scanner/pages.js'
+import { scanPages } from '../../vite-plugin-lit-ssg/src/scanner/pages.js'
 
 describe('scanPages', () => {
   let tmpRoot: string

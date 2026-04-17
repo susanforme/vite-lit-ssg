@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { html } from 'lit'
-import { renderPage } from '../../src/runtime/render-page.js'
-import type { AssetLinks } from '../../src/types.js'
+import { renderPage } from '../../vite-plugin-lit-ssg/src/runtime/render-page.js'
+import type { AssetLinks } from '../../vite-plugin-lit-ssg/src/types.js'
 
 const baseAssets: AssetLinks = {
   js: '/assets/entry-client.js',

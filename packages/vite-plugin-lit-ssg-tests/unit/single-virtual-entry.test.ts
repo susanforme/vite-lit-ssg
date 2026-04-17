@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { generateSingleClientEntry, generateSingleDevEntry } from '../../src/virtual/single-client-entry.js'
-import { generateSingleServerEntry } from '../../src/virtual/single-server-entry.js'
-import type { ResolvedSingleComponentOptions } from '../../src/types.js'
+import { generateSingleClientEntry, generateSingleDevEntry } from '../../vite-plugin-lit-ssg/src/virtual/single-client-entry.js'
+import { generateSingleServerEntry } from '../../vite-plugin-lit-ssg/src/virtual/single-server-entry.js'
+import type { ResolvedSingleComponentOptions } from '../../vite-plugin-lit-ssg/src/types.js'
 
 const defaultOpts: ResolvedSingleComponentOptions = {
   mode: 'single-component',

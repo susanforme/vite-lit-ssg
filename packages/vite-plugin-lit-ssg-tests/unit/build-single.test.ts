@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { resolveRouteFilePath } from '../../src/output/write-route.js'
-import { VIRTUAL_SINGLE_CLIENT_ID, VIRTUAL_SINGLE_SERVER_ID } from '../../src/plugin/index.js'
+import { resolveRouteFilePath } from '../../vite-plugin-lit-ssg/src/output/write-route.js'
+import { VIRTUAL_SINGLE_CLIENT_ID, VIRTUAL_SINGLE_SERVER_ID } from '../../vite-plugin-lit-ssg/src/plugin/index.js'
 
 describe('build-single: manifest key selection', () => {
   it('VIRTUAL_SINGLE_CLIENT_ID is used as manifest key for client assets', () => {
@@ -47,7 +47,7 @@ describe('build-single: cleanup behavior (contract)', () => {
 
 describe('build-single: BuildContext forwarding', () => {
   it('runSingleSSG accepts mode and configFile in BuildContext', async () => {
-    const { runSingleSSG } = await import('../../src/runner/build-single.js')
+    const { runSingleSSG } = await import('../../vite-plugin-lit-ssg/src/runner/build-single.js')
     expect(typeof runSingleSSG).toBe('function')
     expect(runSingleSSG.length).toBeGreaterThanOrEqual(3)
   })

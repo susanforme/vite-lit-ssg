@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { html } from 'lit'
-import { renderComponent } from '../../src/runtime/render-component.js'
-import type { AssetLinks } from '../../src/types.js'
+import { renderComponent } from '../../vite-plugin-lit-ssg/src/runtime/render-component.js'
+import type { AssetLinks } from '../../vite-plugin-lit-ssg/src/types.js'
 
 const template = html`<demo-widget></demo-widget>`
 

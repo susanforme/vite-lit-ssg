@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { resolveSingleComponentOptions } from '../../src/types.js'
-import type { LitSSGOptionsNew, SingleComponentOptions } from '../../src/types.js'
+import { resolveSingleComponentOptions } from '../../vite-plugin-lit-ssg/src/types.js'
+import type { LitSSGOptionsNew, SingleComponentOptions } from '../../vite-plugin-lit-ssg/src/types.js'
 
 describe('resolveSingleComponentOptions', () => {
   it('applies default exportName', () => {

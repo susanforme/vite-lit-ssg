@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { EventEmitter } from 'node:events'
 import type { Plugin } from 'vite'
-import { litSSG } from '../../src/plugin/index.js'
+import { litSSG } from '../../vite-plugin-lit-ssg/src/plugin/index.js'
 
 function buildMockServer(root: string) {
   const watcher = new EventEmitter() as EventEmitter & { add: ReturnType<typeof vi.fn> }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { generateSharedEntry, generatePageEntry } from '../../src/virtual/client-entry.js'
-import { generateServerEntry } from '../../src/virtual/server-entry.js'
-import type { PageEntry } from '../../src/scanner/pages.js'
+import { generateSharedEntry, generatePageEntry } from '../../vite-plugin-lit-ssg/src/virtual/client-entry.js'
+import { generateServerEntry } from '../../vite-plugin-lit-ssg/src/virtual/server-entry.js'
+import type { PageEntry } from '../../vite-plugin-lit-ssg/src/scanner/pages.js'
 
 const pages: PageEntry[] = [
   { filePath: '/project/src/pages/index.ts', importPath: '/src/pages/index.ts', route: '/', slug: 'index' },

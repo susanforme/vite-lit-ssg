@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { resolveAssetsFromManifest } from '../../src/assets/manifest.js'
-import type { ViteManifest } from '../../src/types.js'
+import { resolveAssetsFromManifest } from '../../vite-plugin-lit-ssg/src/assets/manifest.js'
+import type { ViteManifest } from '../../vite-plugin-lit-ssg/src/types.js'
 
 const sampleManifest: ViteManifest = {
   'lit-ssg-page-index': {

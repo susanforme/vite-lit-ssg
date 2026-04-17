@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { html } from 'lit'
-import { normalizePage } from '../../src/runtime/normalize-page.js'
+import { normalizePage } from '../../vite-plugin-lit-ssg/src/runtime/normalize-page.js'
 
 describe('normalizePage', () => {
   it('returns null for null input', () => {

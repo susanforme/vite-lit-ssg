@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveRouteFilePath, routeDepth } from '../../src/output/write-route.js'
+import { resolveRouteFilePath, routeDepth } from '../../vite-plugin-lit-ssg/src/output/write-route.js'
 import { join } from 'node:path'
 
 describe('resolveRouteFilePath', () => {
