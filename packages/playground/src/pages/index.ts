@@ -26,6 +26,10 @@ export class HomePage extends LitElement {
     nav a:hover {
       text-decoration: underline;
     }
+
+    h1:hover{
+      color:red;
+    }
   `
   handleClick() {
     alert('Button clicked!')
