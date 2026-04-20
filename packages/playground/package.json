@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev-style": "vite --config vite.config.convention-test.ts",
+    "build-style": "vite-lit-ssg build --config vite.config.convention-test.ts",
     "build": "vite-lit-ssg build",
     "preview": "vite preview"
   },
