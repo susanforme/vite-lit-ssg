@@ -581,6 +581,7 @@ async function resolveQueuedTargets(
 
 export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
   let state: PluginState
+  let canonicalLitHtmlDir: string | null = null
 
   if (options.mode === 'single-component') {
     state = {
@@ -636,7 +637,15 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
     configResolved(config) {
       state.resolvedConfig = config
-      updateResolvedPaths(state, config.root ?? process.cwd())
+      const root = config.root ?? process.cwd()
+      updateResolvedPaths(state, root)
+      try {
+        const projectRequire = createRequire(join(root, 'package.json'))
+        const litDir = dirname(projectRequire.resolve('lit'))
+        canonicalLitHtmlDir = join(litDir, '..', 'lit-html')
+      } catch {
+        canonicalLitHtmlDir = null
+      }
     },
 
     async options(rollupOptions) {
@@ -990,7 +999,12 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       )
     },
 
-    resolveId(id) {
+    resolveId(id, _importer, opts) {
+      const isSSRContext = Boolean(state.resolvedConfig?.build?.ssr) || opts?.ssr === true
+      if (!isSSRContext && canonicalLitHtmlDir) {
+        if (id === 'lit-html') return join(canonicalLitHtmlDir, 'lit-html.js')
+        if (id.startsWith('lit-html/')) return join(canonicalLitHtmlDir, id.slice('lit-html/'.length))
+      }
       if (state.kind === 'single-component') {
         if (id === VIRTUAL_SINGLE_CLIENT_ID) return RESOLVED_VIRTUAL_SINGLE_CLIENT_ID
         if (id === VIRTUAL_SINGLE_SERVER_ID) return RESOLVED_VIRTUAL_SINGLE_SERVER_ID
