@@ -17,6 +17,7 @@ describe('single-component dev mode — HTML shell (base=/)', () => {
       plugins: [litSSG({
         mode: 'single-component',
         entry: 'src/demo-widget.ts',
+        commonStyles: { file: 'src/common.css' },
         wrapperTag: 'demo-app-root',
       })],
       server: { port: 0 },
@@ -52,6 +53,9 @@ describe('single-component dev mode — HTML shell (base=/)', () => {
     const moduleCode = await res.text()
     expect(moduleCode).not.toContain('@customElement(')
     expect(moduleCode).toContain('demo-widget')
+    expect(moduleCode).toContain('?inline')
+    expect(moduleCode).toContain('__litSsgCommonStyles')
+    expect(moduleCode).toContain('unsafeCSS')
   })
 })
 
@@ -66,6 +70,7 @@ describe('single-component dev mode — HTML shell (base=/demo/)', () => {
       plugins: [litSSG({
         mode: 'single-component',
         entry: 'src/demo-widget.ts',
+        commonStyles: { file: 'src/common.css' },
         wrapperTag: 'demo-app-root',
       })],
       server: { port: 0 },
