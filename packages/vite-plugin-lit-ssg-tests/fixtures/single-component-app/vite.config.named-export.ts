@@ -6,10 +6,11 @@ export default defineConfig({
     mode: 'single-component',
     entry: 'src/demo-widget.ts',
     commonStyles: [{ file: 'src/common.css' }],
-    wrapperTag: 'demo-app-root',
+    exportName: 'NamedWidget',
+    wrapperTag: 'demo-named-root',
     preload: 'inherit',
   })],
   build: {
-    outDir: 'temp/dist-test-inherit',
+    outDir: 'temp/dist-test-named-export',
   },
 })

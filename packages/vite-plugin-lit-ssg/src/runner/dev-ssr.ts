@@ -105,8 +105,10 @@ export async function renderDevSingleComponent(
 
   const scriptTag = `<script type="module" src="${devScriptSrc}"></script>`
 
+  const innerContent = `${appHtml}\n${scriptTag}`
+
   if (!injectPolyfill) {
-    return `<${wrapperTag}>\n${appHtml}\n</${wrapperTag}>\n${scriptTag}`
+    return `<${wrapperTag}>${innerContent}</${wrapperTag}>`
   }
 
   const dsdStyle = dsdPendingStyle
@@ -118,11 +120,8 @@ export async function renderDevSingleComponent(
 
   return [
     dsdStyle,
-    `<${wrapperTag} dsd-pending>`,
-    appHtml,
-    `</${wrapperTag}>`,
+    `<${wrapperTag} dsd-pending>${innerContent}</${wrapperTag}>`,
     polyfillScripts,
-    scriptTag,
   ].filter(Boolean).join('\n')
 }
 

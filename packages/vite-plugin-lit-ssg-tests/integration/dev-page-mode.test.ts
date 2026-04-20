@@ -33,6 +33,7 @@ describe('page-mode dev mode — SSR rendering', () => {
     expect(html).toContain('<!doctype html>')
     expect(html).toContain('shadowrootmode')
     expect(html).toContain('home-page')
+    expect(html).toContain('Hello from SSR')
   })
 
   it('serves correct title from defineLitRoute metadata', async () => {

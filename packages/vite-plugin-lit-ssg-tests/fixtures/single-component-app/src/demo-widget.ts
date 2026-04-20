@@ -16,4 +16,5 @@ export class DemoWidget extends LitElement {
   }
 }
 
+export { DemoWidget as NamedWidget }
 export default DemoWidget
