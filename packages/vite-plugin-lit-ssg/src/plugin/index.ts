@@ -2,30 +2,30 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
 import MagicString from 'magic-string'
 import * as ts from 'typescript'
-import type { Plugin, ResolvedConfig, ViteDevServer } from 'vite'
+import type { ConfigEnv, Plugin, ResolvedConfig, UserConfig, ViteDevServer } from 'vite'
 import type { CommonStylesOptions, LitSSGOptionsNew, ResolvedSingleComponentOptions } from '../types.js'
 import { resolveSingleComponentOptions } from '../types.js'
 import type { PageEntry, ScanPagesOptions } from '../scanner/pages.js'
+import {
+  _ssgActive,
+  PLUGIN_NAME,
+  RESOLVED_VIRTUAL_DEV_PAGE_PREFIX,
+  RESOLVED_VIRTUAL_PAGE_PREFIX,
+  RESOLVED_VIRTUAL_SERVER_ID,
+  RESOLVED_VIRTUAL_SHARED_ID,
+  RESOLVED_VIRTUAL_SINGLE_CLIENT_ID,
+  RESOLVED_VIRTUAL_SINGLE_DEV_ID,
+  RESOLVED_VIRTUAL_SINGLE_SERVER_ID,
+  VIRTUAL_DEV_PAGE_PREFIX,
+  VIRTUAL_PAGE_PREFIX,
+  VIRTUAL_SERVER_ID,
+  VIRTUAL_SHARED_ID,
+  VIRTUAL_SINGLE_CLIENT_ID,
+  VIRTUAL_SINGLE_DEV_ID,
+  VIRTUAL_SINGLE_SERVER_ID,
+} from './constants.js'
 
 const _require = createRequire(import.meta.url)
-
-const PLUGIN_NAME = 'vite-plugin-lit-ssg'
-
-const VIRTUAL_SHARED_ID = 'virtual:lit-ssg-shared'
-const VIRTUAL_SERVER_ID = 'virtual:lit-ssg-server'
-const RESOLVED_VIRTUAL_SHARED_ID = '\0' + VIRTUAL_SHARED_ID
-const RESOLVED_VIRTUAL_SERVER_ID = '\0' + VIRTUAL_SERVER_ID
-const VIRTUAL_PAGE_PREFIX = 'virtual:lit-ssg-page/'
-const RESOLVED_VIRTUAL_PAGE_PREFIX = '\0' + VIRTUAL_PAGE_PREFIX
-const VIRTUAL_DEV_PAGE_PREFIX = 'virtual:lit-ssg-dev-page/'
-const RESOLVED_VIRTUAL_DEV_PAGE_PREFIX = '\0' + VIRTUAL_DEV_PAGE_PREFIX
-
-const VIRTUAL_SINGLE_CLIENT_ID = 'virtual:lit-ssg-single-client'
-const RESOLVED_VIRTUAL_SINGLE_CLIENT_ID = '\0' + VIRTUAL_SINGLE_CLIENT_ID
-const VIRTUAL_SINGLE_SERVER_ID = 'virtual:lit-ssg-single-server'
-const RESOLVED_VIRTUAL_SINGLE_SERVER_ID = '\0' + VIRTUAL_SINGLE_SERVER_ID
-const VIRTUAL_SINGLE_DEV_ID = 'virtual:lit-ssg-single-dev'
-const RESOLVED_VIRTUAL_SINGLE_DEV_ID = '\0' + VIRTUAL_SINGLE_DEV_ID
 
 const COMMON_STYLES_TEXT_IDENTIFIER = '__litSsgCommonCssText'
 const COMMON_STYLES_IDENTIFIER = '__litSsgCommonStyles'
@@ -611,10 +611,11 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     name: PLUGIN_NAME,
     enforce: 'pre',
 
-    config() {
+    async config(userConfig: UserConfig, { command, isSsrBuild }: ConfigEnv) {
       const nodePath = _require.resolve('@lit-labs/ssr-client/lit-element-hydrate-support.js')
       const browserHydratePath = join(dirname(nodePath), '..', 'lit-element-hydrate-support.js')
-      return {
+
+      const base: Omit<UserConfig, 'plugins'> = {
         build: {
           manifest: true,
         },
@@ -631,6 +632,47 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           },
         },
       }
+
+      if (command !== 'build' || isSsrBuild) return base
+
+      const projectRoot = resolve(userConfig.root ?? process.cwd())
+      if (_ssgActive.has(projectRoot)) return base
+
+      if (state.kind === 'single-component') {
+        return {
+          ...base,
+          build: {
+            ...base.build,
+            rollupOptions: {
+              input: { 'lit-ssg-single': VIRTUAL_SINGLE_CLIENT_ID },
+            },
+          },
+        }
+      }
+
+      const { scanPages } = await import('../scanner/pages.js')
+      const pages = await scanPages(projectRoot, state.scanOptions)
+      state.pages = pages
+      syncPageTargets(state)
+
+      const pageInputs: Record<string, string> = {}
+      for (const page of pages) {
+        const key = page.slug.replace(/\//g, '-')
+        pageInputs[key] = `${VIRTUAL_PAGE_PREFIX}${page.slug}`
+      }
+
+      return {
+        ...base,
+        build: {
+          ...base.build,
+          rollupOptions: {
+            input: {
+              'lit-ssg-shared': VIRTUAL_SHARED_ID,
+              ...pageInputs,
+            },
+          },
+        },
+      }
     },
 
     configResolved(config) {
@@ -639,11 +681,42 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     },
 
     async buildStart() {
-      if (state.kind === 'page') {
+      if (state.kind === 'page' && state.pages.length === 0) {
         const { scanPages } = await import('../scanner/pages.js')
         const root = state.resolvedConfig?.root ?? process.cwd()
         state.pages = await scanPages(root, state.scanOptions)
         syncPageTargets(state)
+      }
+    },
+
+    async closeBundle() {
+      const config = state.resolvedConfig
+      if (!config) return
+      if (config.build?.ssr) return
+      if (config.command !== 'build') return
+
+      const projectRoot = config.root ?? process.cwd()
+      if (_ssgActive.has(projectRoot)) return
+
+      const base = config.base ?? '/'
+      const outDir = config.build?.outDir ?? 'dist'
+      const mode = config.mode ?? 'production'
+      const configFile = config.configFile
+      const ctx = { mode, configFile }
+
+      if (state.kind === 'single-component') {
+        const { runSingleSSRRender } = await import('../runner/ssr-render.js')
+        await runSingleSSRRender(state.resolved, projectRoot, base, outDir, ctx)
+        console.log('[vite-lit-ssg] Done!')
+        return
+      }
+
+      if (state.kind === 'page') {
+        const { buildPageInputs } = await import('../runner/build.js')
+        const { runSSRRender } = await import('../runner/ssr-render.js')
+        const pageInputResult = buildPageInputs(state.pages)
+        await runSSRRender(state.pages, pageInputResult, projectRoot, base, outDir, ctx, state.injectPolyfill)
+        console.log('[vite-lit-ssg] Done!')
       }
     },
 
@@ -1021,6 +1094,7 @@ export function getSingleComponentOptions(plugin: object): ResolvedSingleCompone
 }
 
 export {
+  _ssgActive,
   PLUGIN_NAME,
   VIRTUAL_PAGE_PREFIX,
   VIRTUAL_SHARED_ID,
