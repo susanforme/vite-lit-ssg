@@ -713,6 +713,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
     configureServer(server: ViteDevServer) {
       if (state.kind === 'single-component') {
+        const resolved = state.resolved
         server.middlewares.use(async (req, res, next) => {
           const rawUrl = req.url ?? '/'
           const pathname = (rawUrl.split('?')[0] ?? '/').split('#')[0] ?? '/'
@@ -727,25 +728,36 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             : pathname === base.replace(/\/$/, '') || pathname === normalizedBase
           if (!isRoot) return next()
 
-          const htmlTemplate = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dev</title>
-  </head>
-  <body>
-    <script type="module" src="/@id/__x00__${VIRTUAL_SINGLE_DEV_ID}"></script>
-  </body>
-</html>`
+          const devScriptSrc = `/@id/__x00__${VIRTUAL_SINGLE_DEV_ID}`
+          const wrapperTag = typeof resolved.wrapperTag === 'function' ? resolved.wrapperTag() : resolved.wrapperTag
 
           try {
-            const transformed = await server.transformIndexHtml(rawUrl, htmlTemplate)
+            const { renderDevSingleComponent } = await import('../runner/dev-ssr.js')
+            const fragment = await renderDevSingleComponent(
+              server,
+              wrapperTag,
+              devScriptSrc,
+              resolved.injectPolyfill,
+              resolved.dsdPendingStyle,
+            )
+            const htmlShell = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n${fragment}\n  </body>\n</html>`
+            const transformed = await server.transformIndexHtml(rawUrl, htmlShell)
             res.setHeader('Content-Type', 'text/html; charset=utf-8')
             res.statusCode = 200
             res.end(transformed)
           } catch (e) {
-            next(e)
+            server.config.logger.warn(
+              `[vite-plugin-lit-ssg] SSR dev render failed, falling back to client-only: ${e instanceof Error ? e.message : String(e)}`,
+            )
+            const htmlTemplate = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n    <script type="module" src="${devScriptSrc}"></script>\n  </body>\n</html>`
+            try {
+              const transformed = await server.transformIndexHtml(rawUrl, htmlTemplate)
+              res.setHeader('Content-Type', 'text/html; charset=utf-8')
+              res.statusCode = 200
+              res.end(transformed)
+            } catch (e2) {
+              next(e2)
+            }
           }
         })
         return
@@ -907,26 +919,30 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           return
         }
 
-        const devPageId = `${VIRTUAL_DEV_PAGE_PREFIX}${matchedPage.route === '/' ? 'index' : matchedPage.route.slice(1)}`
-        const htmlTemplate = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dev</title>
-  </head>
-  <body>
-    <script type="module" src="/@id/__x00__${devPageId}"></script>
-  </body>
-</html>`
+        const hydrateScriptSrc = `/@id/__x00__${VIRTUAL_PAGE_PREFIX}${matchedPage.slug}`
+        const injectPolyfill = (state as PageModeState).injectPolyfill
 
         try {
-          const transformed = await server.transformIndexHtml(rawUrl, htmlTemplate)
+          const { renderDevPage } = await import('../runner/dev-ssr.js')
+          const ssrHtml = await renderDevPage(server, matchedPage.route, hydrateScriptSrc, injectPolyfill)
+          const transformed = await server.transformIndexHtml(rawUrl, ssrHtml)
           res.setHeader('Content-Type', 'text/html; charset=utf-8')
           res.statusCode = 200
           res.end(transformed)
         } catch (e) {
-          next(e)
+          server.config.logger.warn(
+            `[vite-plugin-lit-ssg] SSR dev render failed for ${matchedPage.route}, falling back to client-only: ${e instanceof Error ? e.message : String(e)}`,
+          )
+          const devPageId = `${VIRTUAL_DEV_PAGE_PREFIX}${matchedPage.route === '/' ? 'index' : matchedPage.route.slice(1)}`
+          const htmlTemplate = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n    <script type="module" src="/@id/__x00__${devPageId}"></script>\n  </body>\n</html>`
+          try {
+            const transformed = await server.transformIndexHtml(rawUrl, htmlTemplate)
+            res.setHeader('Content-Type', 'text/html; charset=utf-8')
+            res.statusCode = 200
+            res.end(transformed)
+          } catch (e2) {
+            next(e2)
+          }
         }
       })
     },
