@@ -27,6 +27,15 @@ describe('resolveSingleComponentOptions', () => {
     expect(resolved.preload).toBe('inherit')
   })
 
+  it('preserves commonStyles when provided', () => {
+    const resolved = resolveSingleComponentOptions({
+      mode: 'single-component',
+      entry: 'src/components/my-element.ts',
+      commonStyles: { file: 'src/styles/common.css' },
+    })
+    expect(resolved.commonStyles).toEqual({ file: 'src/styles/common.css' })
+  })
+
   it('preserves explicit exportName', () => {
     const resolved = resolveSingleComponentOptions({
       mode: 'single-component',
@@ -131,10 +140,16 @@ describe('LitSSGOptionsNew type compatibility', () => {
     expect(opts).toBeDefined()
   })
 
+  it('allows page-mode with commonStyles', () => {
+    const opts: LitSSGOptionsNew = { commonStyles: { file: 'src/styles/common.css' } }
+    expect(opts).toBeDefined()
+  })
+
   it('allows single-component mode with required entry', () => {
     const opts: LitSSGOptionsNew = {
       mode: 'single-component',
       entry: 'src/my-element.ts',
+      commonStyles: { file: 'src/styles/common.css' },
     }
     expect(opts).toBeDefined()
   })
