@@ -1,11 +1,17 @@
 export { litSSG } from './plugin/index.js'
 export type {
-  LitSSGOptions,
-  ResolvedLitSSGOptions,
+  CommonStylesOptions,
+  IgnoreOption,
+  LitSSGOptionsNew as LitSSGOptions,
+  PageModeOptions,
+  PreloadPolicy,
+  PublicLitSSGOptions,
   PageRenderResult,
   PageDescriptor,
   RenderContext,
+  ResolvedSingleComponentOptions,
   ServerEntry,
+  SingleComponentOptions,
   AssetLinks,
 } from './types.js'
 export { defineLitRoute } from './define-route.js'
