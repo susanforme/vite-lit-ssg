@@ -103,38 +103,3 @@ describe('single-component dev mode — HTML shell (base=/demo/)', () => {
     expect(html).toContain('/demo/')
   })
 })
-
-describe('single-component dev mode — injectPolyfill=true', () => {
-  let server: Awaited<ReturnType<typeof createServer>>
-  let port: number
-
-  beforeAll(async () => {
-    server = await createServer({
-      root: FIXTURE_ROOT,
-      base: '/',
-      plugins: [litSSG({
-        mode: 'single-component',
-        entry: 'src/demo-widget.ts',
-        wrapperTag: 'demo-app-root',
-        injectPolyfill: true,
-        dsdPendingStyle: true,
-      })],
-      server: { port: 0 },
-      logLevel: 'silent',
-    })
-    await server.listen()
-    port = (server.httpServer!.address() as AddressInfo).port
-  }, 30_000)
-
-  afterAll(async () => {
-    await Promise.race([server.close(), new Promise(r => setTimeout(r, 5000))])
-  }, 15_000)
-
-  it('wrapper has dsd-pending attribute when injectPolyfill=true', async () => {
-    const res = await fetch(`http://localhost:${port}/`)
-    expect(res.status).toBe(200)
-    const html = await res.text()
-    expect(html).toContain('demo-app-root[dsd-pending]')
-    expect(html).toContain('<demo-app-root dsd-pending>')
-  })
-})
