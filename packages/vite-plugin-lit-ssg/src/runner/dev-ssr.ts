@@ -1,43 +1,27 @@
 import type { ViteDevServer } from 'vite'
-import type { PageRenderResult, PreloadPolicy, ServerEntry } from '../types.js'
+import type { PreloadPolicy } from '../types.js'
 import { VIRTUAL_SERVER_ID, VIRTUAL_SINGLE_SERVER_ID } from '../plugin/constants.js'
 
-async function loadDevServerEntry(server: ViteDevServer, virtualId: string): Promise<ServerEntry> {
-  const mod = await server.ssrLoadModule(virtualId, { fixStacktrace: false })
-  if (typeof mod['render'] !== 'function') {
-    throw new Error(
-      `[vite-plugin-lit-ssg] Dev SSR entry "${virtualId}" must export a \`render\` function`,
-    )
-  }
-  return mod as ServerEntry
+interface DevServerMod {
+  renderToHtml: (url: string, ctx: { route: string; params: Record<string, string> }) => Promise<string | null>
+  getPageMeta?: (url: string) => {
+    title?: string
+    lang?: string
+    meta?: Record<string, string>[]
+    head?: string[]
+    htmlAttrs?: Record<string, string>
+    bodyAttrs?: Record<string, string>
+  } | null
 }
 
-/**
- * Render a PageRenderResult to an HTML string using @lit-labs/ssr.
- *
- * IMPORTANT: We load @lit-labs/ssr via server.ssrLoadModule so it runs in the
- * same Vite SSR module graph as the component code. This ensures both use the
- * same `lit` module instance — which is required for correct template part
- * serialization. If @lit-labs/ssr is loaded via native Node.js import() it gets
- * its own copy of `lit`, causing prototype mismatches that break client hydration.
- */
-async function collectSsrHtml(
-  server: ViteDevServer,
-  result: PageRenderResult,
-): Promise<string> {
-  if (result === null || result === undefined) return ''
-
-  // Load through Vite's SSR module graph — same `lit` instance as the component.
-  const ssrMod = await server.ssrLoadModule('@lit-labs/ssr')
-  const renderResultMod = await server.ssrLoadModule('@lit-labs/ssr/lib/render-result.js')
-  const directiveMod = await server.ssrLoadModule('lit/directive-helpers.js')
-
-  const render = ssrMod['render'] as (v: unknown) => AsyncIterable<string>
-  const collectResult = renderResultMod['collectResult'] as (r: AsyncIterable<string>) => Promise<string>
-  const isTemplateResult = directiveMod['isTemplateResult'] as (v: unknown) => boolean
-
-  const template = isTemplateResult(result) ? result : (result as { template: unknown }).template
-  return collectResult(render(template))
+async function loadDevMod(server: ViteDevServer, virtualId: string): Promise<DevServerMod> {
+  const mod = await server.ssrLoadModule(virtualId, { fixStacktrace: false })
+  if (typeof mod['renderToHtml'] !== 'function') {
+    throw new Error(
+      `[vite-plugin-lit-ssg] Dev SSR entry "${virtualId}" must export a \`renderToHtml\` function`,
+    )
+  }
+  return mod as DevServerMod
 }
 
 export async function renderDevPage(
@@ -46,25 +30,23 @@ export async function renderDevPage(
   devScriptSrc: string,
   injectPolyfill: boolean,
 ): Promise<string> {
-  const serverEntry = await loadDevServerEntry(server, VIRTUAL_SERVER_ID)
-  const result = await serverEntry.render(route, { route, params: {} })
+  const devMod = await loadDevMod(server, VIRTUAL_SERVER_ID)
+  const [appHtml, rawMeta] = await Promise.all([
+    devMod.renderToHtml(route, { route, params: {} }),
+    devMod.getPageMeta ? devMod.getPageMeta(route) : null,
+  ])
 
-  if (result === null || result === undefined) return ''
+  if (appHtml === null || appHtml === undefined) return ''
 
-  const { normalizePage } = await import('../runtime/normalize-page.js')
-  const page = normalizePage(result)
-
-  const lang = page?.lang ?? 'en'
-  const title = page?.title ?? ''
-  const metaTags = page?.meta ?? []
-  const extraHead = page?.head ?? []
-  const htmlAttrs = page?.htmlAttrs ?? {}
-  const bodyAttrs = page?.bodyAttrs ?? {}
+  const lang = rawMeta?.lang ?? 'en'
+  const title = rawMeta?.title ?? ''
+  const metaTags = rawMeta?.meta ?? []
+  const extraHead = rawMeta?.head ?? []
+  const htmlAttrs = rawMeta?.htmlAttrs ?? {}
+  const bodyAttrs = rawMeta?.bodyAttrs ?? {}
 
   const htmlAttrStr = attrsToString({ lang, ...htmlAttrs })
   const bodyAttrStr = attrsToString(bodyAttrs)
-
-  const appHtml = await collectSsrHtml(server, result)
 
   const titleTag = title ? `  <title>${escapeHtml(title)}</title>` : ''
   const metaTagsStr = metaTags.map((attrs) => `  <meta${attrsToString(attrs)}>`).join('\n')
@@ -114,20 +96,34 @@ export async function renderDevSingleComponent(
   dsdPendingStyle: boolean,
   preload: PreloadPolicy,
 ): Promise<string> {
-  const serverEntry = await loadDevServerEntry(server, VIRTUAL_SINGLE_SERVER_ID)
-  const result = await serverEntry.render('/', { route: '/', params: {} })
+  const devMod = await loadDevMod(server, VIRTUAL_SINGLE_SERVER_ID)
+  const appHtml = await devMod.renderToHtml('/', { route: '/', params: {} })
 
-  if (result === null || result === undefined) {
-    throw new Error('[vite-plugin-lit-ssg] single-component SSR dev render returned null u2014 component may not be registered')
+  if (appHtml === null || appHtml === undefined) {
+    throw new Error('[vite-plugin-lit-ssg] single-component SSR dev render returned null — component may not be registered')
   }
 
-  const { renderComponent } = await import('../runtime/render-component.js')
+  const scriptTag = `<script type="module" src="${devScriptSrc}"></script>`
 
-  return renderComponent(result, wrapperTag, { js: devScriptSrc, css: [], modulepreloads: [] }, {
-    preload,
-    injectPolyfill,
-    dsdPendingStyle,
-  })
+  if (!injectPolyfill) {
+    return `<${wrapperTag}>\n${appHtml}\n</${wrapperTag}>\n${scriptTag}`
+  }
+
+  const dsdStyle = dsdPendingStyle
+    ? `<style>${wrapperTag}[dsd-pending]{display:none}</style>`
+    : ''
+
+  const { buildDsdPolyfillScripts } = await import('../runtime/dsd-polyfill.js')
+  const polyfillScripts = await buildDsdPolyfillScripts()
+
+  return [
+    dsdStyle,
+    `<${wrapperTag} dsd-pending>`,
+    appHtml,
+    `</${wrapperTag}>`,
+    polyfillScripts,
+    scriptTag,
+  ].filter(Boolean).join('\n')
 }
 
 function attrsToString(attrs: Record<string, string>): string {
