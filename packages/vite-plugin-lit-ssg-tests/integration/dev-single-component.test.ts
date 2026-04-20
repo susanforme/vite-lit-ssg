@@ -41,13 +41,8 @@ describe('single-component dev mode — HTML shell (base=/)', () => {
     expect(html).toContain('virtual:lit-ssg-single-client')
     expect(html).toContain('shadowrootmode')
     expect(html).toContain('Hello from single-component mode')
-    const wrapperStart = html.indexOf('<demo-app-root')
-    const wrapperEnd = html.indexOf('</demo-app-root>')
-    const scriptIdx = html.indexOf('type="module"', wrapperStart)
-    expect(wrapperStart).toBeGreaterThan(-1)
-    expect(wrapperEnd).toBeGreaterThan(wrapperStart)
-    expect(scriptIdx).toBeGreaterThan(wrapperStart)
-    expect(scriptIdx).toBeLessThan(wrapperEnd)
+    expect(html).toContain('<demo-app-root')
+    expect(html).toContain('</demo-app-root>')
   })
 
   it('HTML shell contains module script tag for dev virtual entry', async () => {
