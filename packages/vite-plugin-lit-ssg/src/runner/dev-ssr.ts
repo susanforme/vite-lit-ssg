@@ -12,15 +12,32 @@ async function loadDevServerEntry(server: ViteDevServer, virtualId: string): Pro
   return mod as ServerEntry
 }
 
-async function collectSsrHtml(result: PageRenderResult): Promise<string> {
+/**
+ * Render a PageRenderResult to an HTML string using @lit-labs/ssr.
+ *
+ * IMPORTANT: We load @lit-labs/ssr via server.ssrLoadModule so it runs in the
+ * same Vite SSR module graph as the component code. This ensures both use the
+ * same `lit` module instance — which is required for correct template part
+ * serialization. If @lit-labs/ssr is loaded via native Node.js import() it gets
+ * its own copy of `lit`, causing prototype mismatches that break client hydration.
+ */
+async function collectSsrHtml(
+  server: ViteDevServer,
+  result: PageRenderResult,
+): Promise<string> {
   if (result === null || result === undefined) return ''
 
-  const { render } = await import('@lit-labs/ssr')
-  const { collectResult } = await import('@lit-labs/ssr/lib/render-result.js')
-  const { isTemplateResult } = await import('lit/directive-helpers.js')
+  // Load through Vite's SSR module graph — same `lit` instance as the component.
+  const ssrMod = await server.ssrLoadModule('@lit-labs/ssr')
+  const renderResultMod = await server.ssrLoadModule('@lit-labs/ssr/lib/render-result.js')
+  const directiveMod = await server.ssrLoadModule('lit/directive-helpers.js')
+
+  const render = ssrMod['render'] as (v: unknown) => AsyncIterable<string>
+  const collectResult = renderResultMod['collectResult'] as (r: AsyncIterable<string>) => Promise<string>
+  const isTemplateResult = directiveMod['isTemplateResult'] as (v: unknown) => boolean
 
   const template = isTemplateResult(result) ? result : (result as { template: unknown }).template
-  return collectResult(render(template as Parameters<typeof render>[0]))
+  return collectResult(render(template))
 }
 
 export async function renderDevPage(
@@ -47,7 +64,7 @@ export async function renderDevPage(
   const htmlAttrStr = attrsToString({ lang, ...htmlAttrs })
   const bodyAttrStr = attrsToString(bodyAttrs)
 
-  const appHtml = await collectSsrHtml(result)
+  const appHtml = await collectSsrHtml(server, result)
 
   const titleTag = title ? `  <title>${escapeHtml(title)}</title>` : ''
   const metaTagsStr = metaTags.map((attrs) => `  <meta${attrsToString(attrs)}>`).join('\n')
