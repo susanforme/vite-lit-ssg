@@ -42,8 +42,7 @@ type TargetResolution =
 
 interface SharedTransformState {
   resolvedConfig: ResolvedConfig | null
-  commonStyleFiles: string[]
-  commonStyleImports: string[]
+  commonStyles: CommonStylesOptions
   transformTargets: Map<string, TransformTargetRequest[]>
 }
 
@@ -93,11 +92,6 @@ function resolveCommonStylesImports(root: string, commonStyles: CommonStylesOpti
 }
 
 function updateResolvedPaths(state: PluginState, root: string): void {
-  state.commonStyleImports = resolveCommonStylesImports(
-    root,
-    state.commonStyleFiles.map((file) => ({ file })),
-  )
-
   if (state.kind === 'single-component') {
     state.entryModuleId = normalizeFileId(resolve(root, state.resolved.entry))
   }
@@ -593,8 +587,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       resolved: resolveSingleComponentOptions(options),
       resolvedConfig: null,
       entryModuleId: null,
-      commonStyleFiles: options.commonStyles?.map(({ file }) => file) ?? [],
-      commonStyleImports: [],
+      commonStyles: options.commonStyles ?? [],
       transformTargets: new Map(),
     }
   } else {
@@ -609,8 +602,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       pages: [],
       pageModuleIds: new Set(),
       injectPolyfill: options.injectPolyfill ?? true,
-      commonStyleFiles: options.commonStyles?.map(({ file }) => file) ?? [],
-      commonStyleImports: [],
+      commonStyles: options.commonStyles ?? [],
       transformTargets: new Map(),
     }
   }
@@ -877,8 +869,10 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
     async transform(code, id) {
       const cleanId = normalizeFileId(id)
+      const root = state.resolvedConfig?.root ?? process.cwd()
+      const commonStyleImports = resolveCommonStylesImports(root, state.commonStyles)
 
-      if (state.commonStyleImports.length === 0) return null
+      if (commonStyleImports.length === 0) return null
       if (!shouldHandleModule(cleanId)) return null
       if (id.includes('?inline')) return null
       if (code.includes(`const ${COMMON_STYLES_IDENTIFIER} =`)) return null
@@ -917,7 +911,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         code,
         sourceFile,
         cleanId,
-        state.commonStyleImports,
+        commonStyleImports,
         localTargets,
       )
     },

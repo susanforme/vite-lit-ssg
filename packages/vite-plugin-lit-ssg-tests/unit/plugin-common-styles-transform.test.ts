@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import type { ResolvedConfig } from 'vite'
 import { litSSG } from '../../vite-plugin-lit-ssg/src/plugin/index.js'
+import type { CommonStylesOptions } from '../../vite-plugin-lit-ssg/src/types.js'
 
 interface TestResolveContext {
   resolve: (specifier: string, importer?: string) => Promise<{ id: string }>
@@ -70,9 +71,9 @@ async function createTempProject(files: Record<string, string>) {
   return root
 }
 
-async function initPagePlugin(root: string, commonStyleFiles = ['src/styles/common.css']) {
+async function initPagePlugin(root: string, commonStyles: CommonStylesOptions = [{ file: 'src/styles/common.css' }]) {
   const plugin = litSSG({
-    commonStyles: commonStyleFiles.map((file) => ({ file })),
+    commonStyles,
   }) as unknown as TestPlugin
 
   if (!plugin.configResolved || !plugin.buildStart) {
@@ -84,12 +85,16 @@ async function initPagePlugin(root: string, commonStyleFiles = ['src/styles/comm
   return plugin
 }
 
-async function initSinglePlugin(root: string, exportName = 'default', commonStyleFiles = ['src/styles/common.css']) {
+async function initSinglePlugin(
+  root: string,
+  exportName = 'default',
+  commonStyles: CommonStylesOptions = [{ file: 'src/styles/common.css' }],
+) {
   const plugin = litSSG({
     mode: 'single-component',
     entry: 'src/demo-widget.ts',
     exportName,
-    commonStyles: commonStyleFiles.map((file) => ({ file })),
+    commonStyles,
   }) as unknown as TestPlugin
 
   if (!plugin.configResolved) {
@@ -256,7 +261,10 @@ export default DemoWidget
     })
     roots.push(root)
 
-    const plugin = await initSinglePlugin(root, 'default', ['src/styles/first.css', 'src/styles/second.css'])
+    const plugin = await initSinglePlugin(root, 'default', [
+      { file: 'src/styles/first.css' },
+      { file: 'src/styles/second.css' },
+    ])
     const entryPath = join(root, 'src/demo-widget.ts')
     const code = await readFile(entryPath, 'utf-8')
     if (!plugin.transform) throw new Error('Expected transform hook to be defined.')
