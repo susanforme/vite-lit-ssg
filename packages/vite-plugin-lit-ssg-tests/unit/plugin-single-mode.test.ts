@@ -11,11 +11,12 @@ function buildSingleComponentDevServer(base: string) {
   const makeRes = () => ({ setHeader: setHeaderFn, end: endFn, statusCode: 200 })
 
   const server = {
-    config: { root: '/tmp', base },
+    config: { root: '/tmp', base, logger: { warn: vi.fn() } },
     middlewares: { use: vi.fn() },
     watcher: { add: vi.fn(), on: vi.fn() },
     moduleGraph: { getModuleById: vi.fn(), invalidateModule: vi.fn() },
     ws: { send: vi.fn() },
+    ssrLoadModule: vi.fn().mockRejectedValue(new Error('ssrLoadModule not available in unit test mock')),
     transformIndexHtml: vi.fn().mockImplementation((_url: string, html: string) => Promise.resolve(html)),
   }
 

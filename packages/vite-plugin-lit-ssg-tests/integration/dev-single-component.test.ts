@@ -38,7 +38,8 @@ describe('single-component dev mode — HTML shell (base=/)', () => {
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('<html')
     expect(html).toContain('<body')
-    expect(html).toContain('virtual:lit-ssg-single-dev')
+    expect(html).toContain('virtual:lit-ssg-single-client')
+    expect(html).toContain('shadowrootmode')
   })
 
   it('HTML shell contains module script tag for dev virtual entry', async () => {
@@ -89,7 +90,8 @@ describe('single-component dev mode — HTML shell (base=/demo/)', () => {
     expect(res.status).toBe(200)
     const html = await res.text()
     expect(html).toContain('<!DOCTYPE html>')
-    expect(html).toContain('virtual:lit-ssg-single-dev')
+    expect(html).toContain('virtual:lit-ssg-single-client')
+    expect(html).toContain('shadowrootmode')
   })
 
   it('asset URLs include /demo/ prefix when base=/demo/', async () => {
