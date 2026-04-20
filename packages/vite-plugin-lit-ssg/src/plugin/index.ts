@@ -630,6 +630,13 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           alias: {
             '@lit-labs/ssr-client/lit-element-hydrate-support.js': browserHydratePath,
           },
+          dedupe: [
+            'lit',
+            'lit-html',
+            'lit-element',
+            '@lit/reactive-element',
+            '@lit-labs/ssr-client',
+          ],
         },
       }
     },
