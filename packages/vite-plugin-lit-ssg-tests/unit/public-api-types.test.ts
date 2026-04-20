@@ -9,7 +9,7 @@ import {
 
 describe('public root API types', () => {
   it('accepts commonStyles through page-mode root exports', () => {
-    const commonStyles: CommonStylesOptions = { file: 'src/styles/common.css' }
+    const commonStyles: CommonStylesOptions = [{ file: 'src/styles/common.css' }]
     const pageOptions: PageModeOptions = {
       commonStyles,
     }
@@ -23,7 +23,7 @@ describe('public root API types', () => {
     const singleOptions: SingleComponentOptions = {
       mode: 'single-component',
       entry: 'src/demo-widget.ts',
-      commonStyles: { file: 'src/styles/common.css' },
+      commonStyles: [{ file: 'src/styles/common.css' }],
     }
     const publicOptions: LitSSGOptions = singleOptions
 

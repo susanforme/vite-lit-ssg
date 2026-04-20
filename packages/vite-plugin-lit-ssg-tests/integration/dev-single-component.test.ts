@@ -17,7 +17,7 @@ describe('single-component dev mode — HTML shell (base=/)', () => {
       plugins: [litSSG({
         mode: 'single-component',
         entry: 'src/demo-widget.ts',
-        commonStyles: { file: 'src/common.css' },
+        commonStyles: [{ file: 'src/common.css' }],
         wrapperTag: 'demo-app-root',
       })],
       server: { port: 0 },
@@ -70,7 +70,7 @@ describe('single-component dev mode — HTML shell (base=/demo/)', () => {
       plugins: [litSSG({
         mode: 'single-component',
         entry: 'src/demo-widget.ts',
-        commonStyles: { file: 'src/common.css' },
+        commonStyles: [{ file: 'src/common.css' }],
         wrapperTag: 'demo-app-root',
       })],
       server: { port: 0 },

@@ -114,10 +114,13 @@ export type { IgnoreOption }
 
 export type PreloadPolicy = 'inherit' | 'none' | 'entry-only'
 
-export interface CommonStylesOptions {
+export interface CommonStyleEntry {
   /** Path to a shared stylesheet relative to project root, e.g. 'src/styles/common.scss'. */
   file: string
 }
+
+/** Ordered shared stylesheets applied before component-local styles. */
+export type CommonStylesOptions = CommonStyleEntry[]
 
 export interface PageModeOptions {
   mode?: 'page'

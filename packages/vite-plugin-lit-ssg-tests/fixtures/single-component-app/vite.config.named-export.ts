@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [litSSG({
     mode: 'single-component',
     entry: 'src/demo-widget.ts',
-    commonStyles: { file: 'src/common.css' },
+    commonStyles: [{ file: 'src/common.css' }],
     exportName: 'NamedWidget',
     wrapperTag: 'demo-named-root',
     preload: 'inherit',

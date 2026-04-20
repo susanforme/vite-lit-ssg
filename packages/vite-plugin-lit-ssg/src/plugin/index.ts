@@ -42,8 +42,8 @@ type TargetResolution =
 
 interface SharedTransformState {
   resolvedConfig: ResolvedConfig | null
-  commonStylesFile: string | null
-  commonStylesImport: string | null
+  commonStyleFiles: string[]
+  commonStyleImports: string[]
   transformTargets: Map<string, TransformTargetRequest[]>
 }
 
@@ -78,22 +78,24 @@ function toImportPath(filePath: string): string {
   return filePath.replace(/\\/g, '/')
 }
 
-function resolveCommonStylesImport(root: string, commonStyles: CommonStylesOptions | undefined): string | null {
-  if (!commonStyles) return null
+function resolveCommonStylesImports(root: string, commonStyles: CommonStylesOptions | undefined): string[] {
+  if (!commonStyles || commonStyles.length === 0) return []
 
-  const absoluteFile = resolve(root, commonStyles.file)
-  const relativeToRoot = relative(root, absoluteFile)
-  const importPath = !relativeToRoot.startsWith('..') && !isAbsolute(relativeToRoot)
-    ? `/${toImportPath(relativeToRoot)}`
-    : toImportPath(absoluteFile)
+  return commonStyles.map(({ file }) => {
+    const absoluteFile = resolve(root, file)
+    const relativeToRoot = relative(root, absoluteFile)
+    const importPath = !relativeToRoot.startsWith('..') && !isAbsolute(relativeToRoot)
+      ? `/${toImportPath(relativeToRoot)}`
+      : toImportPath(absoluteFile)
 
-  return `${importPath}?inline`
+    return `${importPath}?inline`
+  })
 }
 
 function updateResolvedPaths(state: PluginState, root: string): void {
-  state.commonStylesImport = resolveCommonStylesImport(
+  state.commonStyleImports = resolveCommonStylesImports(
     root,
-    state.commonStylesFile == null ? undefined : { file: state.commonStylesFile },
+    state.commonStyleFiles.map((file) => ({ file })),
   )
 
   if (state.kind === 'single-component') {
@@ -374,11 +376,11 @@ function prependCommonStyles(expression: ts.Expression, sourceFile: ts.SourceFil
   if (ts.isArrayLiteralExpression(expression)) {
     const elements = expression.elements.map((element) => element.getText(sourceFile))
     return elements.length === 0
-      ? `[${COMMON_STYLES_IDENTIFIER}]`
-      : `[${COMMON_STYLES_IDENTIFIER}, ${elements.join(', ')}]`
+      ? `[...${COMMON_STYLES_IDENTIFIER}]`
+      : `[...${COMMON_STYLES_IDENTIFIER}, ${elements.join(', ')}]`
   }
 
-  return `[${COMMON_STYLES_IDENTIFIER}, ${expression.getText(sourceFile)}]`
+  return `[...${COMMON_STYLES_IDENTIFIER}, ${expression.getText(sourceFile)}]`
 }
 
 function getLineIndentation(source: string, position: number): string {
@@ -407,8 +409,12 @@ function insertCommonStylesMember(
   const memberIndent = `${classIndent}  `
   magicString.appendLeft(
     openBrace + 1,
-    `\n${memberIndent}static styles = [${COMMON_STYLES_IDENTIFIER}]\n`,
+    `\n${memberIndent}static styles = [...${COMMON_STYLES_IDENTIFIER}]\n`,
   )
+}
+
+function getCommonStylesTextIdentifier(index: number): string {
+  return `${COMMON_STYLES_TEXT_IDENTIFIER}${index}`
 }
 
 function rewriteTargetClass(
@@ -453,9 +459,15 @@ function rewriteTargetClass(
 function insertCommonStylesHelper(
   magicString: MagicString,
   sourceFile: ts.SourceFile,
-  commonStylesImport: string,
+  commonStylesImports: string[],
 ): void {
-  const helperBlock = `import { css as ${COMMON_STYLES_CSS_IDENTIFIER}, unsafeCSS as ${COMMON_STYLES_UNSAFE_CSS_IDENTIFIER} } from 'lit'\nimport ${COMMON_STYLES_TEXT_IDENTIFIER} from '${commonStylesImport}'\nconst ${COMMON_STYLES_IDENTIFIER} = ${COMMON_STYLES_CSS_IDENTIFIER}\`\${${COMMON_STYLES_UNSAFE_CSS_IDENTIFIER}(${COMMON_STYLES_TEXT_IDENTIFIER})}\`\n`
+  const textImports = commonStylesImports
+    .map((commonStylesImport, index) => `import ${getCommonStylesTextIdentifier(index)} from '${commonStylesImport}'`)
+    .join('\n')
+  const commonStylesEntries = commonStylesImports
+    .map((_, index) => `${COMMON_STYLES_CSS_IDENTIFIER}\`\${${COMMON_STYLES_UNSAFE_CSS_IDENTIFIER}(${getCommonStylesTextIdentifier(index)})}\``)
+    .join(', ')
+  const helperBlock = `import { css as ${COMMON_STYLES_CSS_IDENTIFIER}, unsafeCSS as ${COMMON_STYLES_UNSAFE_CSS_IDENTIFIER} } from 'lit'\n${textImports}\nconst ${COMMON_STYLES_IDENTIFIER} = [${commonStylesEntries}]\n`
   const imports = sourceFile.statements.filter(ts.isImportDeclaration)
 
   if (imports.length > 0) {
@@ -470,7 +482,7 @@ function rewriteModuleWithCommonStyles(
   code: string,
   sourceFile: ts.SourceFile,
   cleanId: string,
-  commonStylesImport: string,
+  commonStylesImports: string[],
   targetClassNames: Set<string>,
 ): { code: string, map: ReturnType<MagicString['generateMap']> } | null {
   if (targetClassNames.size === 0) return null
@@ -494,7 +506,7 @@ function rewriteModuleWithCommonStyles(
     rewriteTargetClass(magicString, code, sourceFile, classDecl)
   }
 
-  insertCommonStylesHelper(magicString, sourceFile, commonStylesImport)
+  insertCommonStylesHelper(magicString, sourceFile, commonStylesImports)
 
   return {
     code: magicString.toString(),
@@ -581,8 +593,8 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       resolved: resolveSingleComponentOptions(options),
       resolvedConfig: null,
       entryModuleId: null,
-      commonStylesFile: options.commonStyles?.file ?? null,
-      commonStylesImport: null,
+      commonStyleFiles: options.commonStyles?.map(({ file }) => file) ?? [],
+      commonStyleImports: [],
       transformTargets: new Map(),
     }
   } else {
@@ -597,8 +609,8 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       pages: [],
       pageModuleIds: new Set(),
       injectPolyfill: options.injectPolyfill ?? true,
-      commonStylesFile: options.commonStyles?.file ?? null,
-      commonStylesImport: null,
+      commonStyleFiles: options.commonStyles?.map(({ file }) => file) ?? [],
+      commonStyleImports: [],
       transformTargets: new Map(),
     }
   }
@@ -866,7 +878,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     async transform(code, id) {
       const cleanId = normalizeFileId(id)
 
-      if (state.commonStylesImport == null) return null
+      if (state.commonStyleImports.length === 0) return null
       if (!shouldHandleModule(cleanId)) return null
       if (id.includes('?inline')) return null
       if (code.includes(`const ${COMMON_STYLES_IDENTIFIER} =`)) return null
@@ -905,7 +917,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         code,
         sourceFile,
         cleanId,
-        state.commonStylesImport,
+        state.commonStyleImports,
         localTargets,
       )
     },

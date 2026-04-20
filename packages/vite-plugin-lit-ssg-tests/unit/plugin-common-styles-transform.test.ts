@@ -70,9 +70,9 @@ async function createTempProject(files: Record<string, string>) {
   return root
 }
 
-async function initPagePlugin(root: string) {
+async function initPagePlugin(root: string, commonStyleFiles = ['src/styles/common.css']) {
   const plugin = litSSG({
-    commonStyles: { file: 'src/styles/common.css' },
+    commonStyles: commonStyleFiles.map((file) => ({ file })),
   }) as unknown as TestPlugin
 
   if (!plugin.configResolved || !plugin.buildStart) {
@@ -84,12 +84,12 @@ async function initPagePlugin(root: string) {
   return plugin
 }
 
-async function initSinglePlugin(root: string, exportName = 'default') {
+async function initSinglePlugin(root: string, exportName = 'default', commonStyleFiles = ['src/styles/common.css']) {
   const plugin = litSSG({
     mode: 'single-component',
     entry: 'src/demo-widget.ts',
     exportName,
-    commonStyles: { file: 'src/styles/common.css' },
+    commonStyles: commonStyleFiles.map((file) => ({ file })),
   }) as unknown as TestPlugin
 
   if (!plugin.configResolved) {
@@ -137,8 +137,9 @@ export default defineLitRoute({
 
     expect(result).not.toBeNull()
     const transformed = getTransformedCode(result)
-    expect(transformed).toContain("import __litSsgCommonCssText from '/src/styles/common.css?inline'")
-    expect(transformed).toContain('static styles = [__litSsgCommonStyles, css`p { color: red; }`]')
+    expect(transformed).toContain("import __litSsgCommonCssText0 from '/src/styles/common.css?inline'")
+    expect(transformed).toContain('const __litSsgCommonStyles = [__litSsgCss`${__litSsgUnsafeCSS(__litSsgCommonCssText0)}`]')
+    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`p { color: red; }`]')
     expect(transformed).toContain('static styles = css`p { color: orange; }`')
     expect(transformed.match(/__litSsgCommonStyles/g)?.length).toBeGreaterThanOrEqual(2)
   })
@@ -183,7 +184,7 @@ export class ImportedPage extends LitElement {}
     const transformed = getTransformedCode(importedResult)
 
     expect(resolveContext.resolve).toHaveBeenCalled()
-    expect(transformed).toContain('static styles = [__litSsgCommonStyles]')
+    expect(transformed).toContain('static styles = [...__litSsgCommonStyles]')
     expect(transformed).toContain("static styles = [\n    'leave me alone',\n  ]")
   })
 
@@ -209,7 +210,7 @@ export default DemoWidget
     const result = await plugin.transform.call(createResolveContext(root), code, entryPath)
     const transformed = getTransformedCode(result)
 
-    expect(transformed).toContain('static styles = [__litSsgCommonStyles, css`:host { color: blue; }`, css`p { color: red; }`]')
+    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`:host { color: blue; }`, css`p { color: red; }`]')
   })
 
   it('prepends common styles ahead of generic static styles expressions', async () => {
@@ -236,7 +237,37 @@ export default DemoWidget
     const result = await plugin.transform.call(createResolveContext(root), code, entryPath)
     const transformed = getTransformedCode(result)
 
-    expect(transformed).toContain('static styles = [__litSsgCommonStyles, localStyles]')
+    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, localStyles]')
+  })
+
+  it('preserves configured commonStyles order', async () => {
+    const root = await createTempProject({
+      'src/styles/first.css': ':host { border-top: 4px solid chartreuse; }',
+      'src/styles/second.css': ':host { color: rebeccapurple; }',
+      'src/demo-widget.ts': `
+import { LitElement, css } from 'lit'
+
+export class DemoWidget extends LitElement {
+  static styles = css\`p { color: blue; }\`
+}
+
+export default DemoWidget
+`,
+    })
+    roots.push(root)
+
+    const plugin = await initSinglePlugin(root, 'default', ['src/styles/first.css', 'src/styles/second.css'])
+    const entryPath = join(root, 'src/demo-widget.ts')
+    const code = await readFile(entryPath, 'utf-8')
+    if (!plugin.transform) throw new Error('Expected transform hook to be defined.')
+    const result = await plugin.transform.call(createResolveContext(root), code, entryPath)
+    const transformed = getTransformedCode(result)
+
+    expect(transformed).toContain("import __litSsgCommonCssText0 from '/src/styles/first.css?inline'")
+    expect(transformed).toContain("import __litSsgCommonCssText1 from '/src/styles/second.css?inline'")
+    expect(transformed).toContain('const __litSsgCommonStyles = [__litSsgCss`${__litSsgUnsafeCSS(__litSsgCommonCssText0)}`, __litSsgCss`${__litSsgUnsafeCSS(__litSsgCommonCssText1)}`]')
+    expect(transformed.indexOf('__litSsgCommonCssText0')).toBeLessThan(transformed.indexOf('__litSsgCommonCssText1'))
+    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`p { color: blue; }`]')
   })
 
   it('rewrites only the configured single-component export', async () => {
@@ -265,7 +296,7 @@ export { DemoWidget as NamedWidget }
     const result = await plugin.transform.call(createResolveContext(root), code, entryPath)
     const transformed = getTransformedCode(result)
 
-    expect(transformed).toContain('static styles = [__litSsgCommonStyles, css`p { color: blue; }`]')
+    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`p { color: blue; }`]')
     expect(transformed).toContain('static styles = css`p { color: orange; }`')
   })
 
@@ -324,6 +355,6 @@ export default DemoWidget
     const result = await plugin.transform.call(createResolveContext(root), code, entryPath)
     const transformed = getTransformedCode(result)
 
-    expect(transformed).toContain('return [__litSsgCommonStyles, css`p { color: rebeccapurple; }`]')
+    expect(transformed).toContain('return [...__litSsgCommonStyles, css`p { color: rebeccapurple; }`]')
   })
 })
