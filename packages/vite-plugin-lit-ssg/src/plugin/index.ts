@@ -740,6 +740,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
               hydrateScriptSrc,
               resolved.injectPolyfill,
               resolved.dsdPendingStyle,
+              resolved.preload,
             )
             const htmlShell = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n${fragment}\n  </body>\n</html>`
             const transformed = await server.transformIndexHtml(rawUrl, htmlShell)
@@ -747,7 +748,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             res.statusCode = 200
             res.end(transformed)
           } catch (e) {
-            server.config.logger.warn(
+            server.config.logger.error(
               `[vite-plugin-lit-ssg] SSR dev render failed, falling back to client-only: ${e instanceof Error ? e.message : String(e)}`,
             )
             const htmlTemplate = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n    <script type="module" src="${fallbackScriptSrc}"></script>\n  </body>\n</html>`
@@ -931,9 +932,9 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           res.statusCode = 200
           res.end(transformed)
         } catch (e) {
-          server.config.logger.warn(
-            `[vite-plugin-lit-ssg] SSR dev render failed for ${matchedPage.route}, falling back to client-only: ${e instanceof Error ? e.message : String(e)}`,
-          )
+            server.config.logger.error(
+              `[vite-plugin-lit-ssg] SSR dev render failed for ${matchedPage.route}, falling back to client-only: ${e instanceof Error ? e.message : String(e)}`,
+            )
           const devPageId = `${VIRTUAL_DEV_PAGE_PREFIX}${matchedPage.route === '/' ? 'index' : matchedPage.route.slice(1)}`
           const htmlTemplate = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n    <script type="module" src="/@id/__x00__${devPageId}"></script>\n  </body>\n</html>`
           try {

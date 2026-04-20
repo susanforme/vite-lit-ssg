@@ -1,5 +1,5 @@
 import type { ViteDevServer } from 'vite'
-import type { PageRenderResult, ServerEntry } from '../types.js'
+import type { PageRenderResult, PreloadPolicy, ServerEntry } from '../types.js'
 import { VIRTUAL_SERVER_ID, VIRTUAL_SINGLE_SERVER_ID } from '../plugin/constants.js'
 
 async function loadDevServerEntry(server: ViteDevServer, virtualId: string): Promise<ServerEntry> {
@@ -95,18 +95,19 @@ export async function renderDevSingleComponent(
   devScriptSrc: string,
   injectPolyfill: boolean,
   dsdPendingStyle: boolean,
+  preload: PreloadPolicy,
 ): Promise<string> {
   const serverEntry = await loadDevServerEntry(server, VIRTUAL_SINGLE_SERVER_ID)
   const result = await serverEntry.render('/', { route: '/', params: {} })
 
   if (result === null || result === undefined) {
-    throw new Error('[vite-plugin-lit-ssg] single-component SSR dev render returned null — component may not be registered')
+    throw new Error('[vite-plugin-lit-ssg] single-component SSR dev render returned null u2014 component may not be registered')
   }
 
   const { renderComponent } = await import('../runtime/render-component.js')
 
   return renderComponent(result, wrapperTag, { js: devScriptSrc, css: [], modulepreloads: [] }, {
-    preload: 'entry-only',
+    preload,
     injectPolyfill,
     dsdPendingStyle,
   })

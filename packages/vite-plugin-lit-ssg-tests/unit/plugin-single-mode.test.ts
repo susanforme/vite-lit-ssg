@@ -11,7 +11,7 @@ function buildSingleComponentDevServer(base: string) {
   const makeRes = () => ({ setHeader: setHeaderFn, end: endFn, statusCode: 200 })
 
   const server = {
-    config: { root: '/tmp', base, logger: { warn: vi.fn() } },
+    config: { root: '/tmp', base, logger: { warn: vi.fn(), error: vi.fn() } },
     middlewares: { use: vi.fn() },
     watcher: { add: vi.fn(), on: vi.fn() },
     moduleGraph: { getModuleById: vi.fn(), invalidateModule: vi.fn() },
