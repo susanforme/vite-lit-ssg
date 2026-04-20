@@ -728,7 +728,8 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             : pathname === base.replace(/\/$/, '') || pathname === normalizedBase
           if (!isRoot) return next()
 
-          const devScriptSrc = `/@id/__x00__${VIRTUAL_SINGLE_DEV_ID}`
+          const hydrateScriptSrc = `/@id/__x00__${VIRTUAL_SINGLE_CLIENT_ID}`
+          const fallbackScriptSrc = `/@id/__x00__${VIRTUAL_SINGLE_DEV_ID}`
           const wrapperTag = typeof resolved.wrapperTag === 'function' ? resolved.wrapperTag() : resolved.wrapperTag
 
           try {
@@ -736,7 +737,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             const fragment = await renderDevSingleComponent(
               server,
               wrapperTag,
-              devScriptSrc,
+              hydrateScriptSrc,
               resolved.injectPolyfill,
               resolved.dsdPendingStyle,
             )
@@ -749,7 +750,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             server.config.logger.warn(
               `[vite-plugin-lit-ssg] SSR dev render failed, falling back to client-only: ${e instanceof Error ? e.message : String(e)}`,
             )
-            const htmlTemplate = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n    <script type="module" src="${devScriptSrc}"></script>\n  </body>\n</html>`
+            const htmlTemplate = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n    <script type="module" src="${fallbackScriptSrc}"></script>\n  </body>\n</html>`
             try {
               const transformed = await server.transformIndexHtml(rawUrl, htmlTemplate)
               res.setHeader('Content-Type', 'text/html; charset=utf-8')
