@@ -28,6 +28,9 @@ export interface LitSSGOptions {
   outDir?: string
 }
 
+/** @deprecated Internal legacy shape kept for route-resolution helpers. Use `PageModeOptions | SingleComponentOptions` publicly. */
+export type LegacyLitSSGOptions = LitSSGOptions
+
 /**
  * Normalized options with all defaults applied.
  */
@@ -37,6 +40,9 @@ export interface ResolvedLitSSGOptions {
   routes: string[] | (() => Promise<string[]>)
   outDir: string
 }
+
+/** @deprecated Internal legacy resolved shape kept for older helpers. */
+export type LegacyResolvedLitSSGOptions = ResolvedLitSSGOptions
 
 /**
  * Context object passed to the server-side render function.
@@ -108,10 +114,16 @@ export type { IgnoreOption }
 
 export type PreloadPolicy = 'inherit' | 'none' | 'entry-only'
 
+export interface CommonStylesOptions {
+  /** Path to a shared stylesheet relative to project root, e.g. 'src/styles/common.scss'. */
+  file: string
+}
+
 export interface PageModeOptions {
   mode?: 'page'
   pagesDir?: string
   ignore?: IgnoreOption | IgnoreOption[]
+  commonStyles?: CommonStylesOptions
   /**
    * Whether to inject the Declarative Shadow DOM polyfill scripts into rendered HTML.
    * Defaults to `true`. Set to `false` to omit polyfill injection (e.g. when targeting
@@ -124,6 +136,7 @@ export interface SingleComponentOptions {
   mode: 'single-component'
   /** Path to the component module (relative to project root, e.g. 'src/components/my-element.ts') */
   entry: string
+  commonStyles?: CommonStylesOptions
   /** Named export to use. Defaults to 'default'. */
   exportName?: string
   /** Custom element tag to use as the wrapper. Can be a string or a zero-argument function returning a string. Defaults to 'lit-ssg-root'. */
@@ -144,10 +157,12 @@ export interface SingleComponentOptions {
 }
 
 export type LitSSGOptionsNew = PageModeOptions | SingleComponentOptions
+export type PublicLitSSGOptions = LitSSGOptionsNew
 
 export interface ResolvedSingleComponentOptions {
   mode: 'single-component'
   entry: string
+  commonStyles?: CommonStylesOptions
   exportName: string
   wrapperTag: string | (() => string)
   preload: PreloadPolicy
@@ -160,6 +175,7 @@ export function resolveSingleComponentOptions(opts: SingleComponentOptions): Res
   return {
     mode: 'single-component',
     entry: opts.entry,
+    ...(opts.commonStyles ? { commonStyles: opts.commonStyles } : {}),
     exportName: opts.exportName ?? 'default',
     wrapperTag: opts.wrapperTag ?? 'lit-ssg-root',
     preload: opts.preload ?? 'inherit',
