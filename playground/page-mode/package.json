@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev-style": "vite --config vite.config.convention-test.ts",
     "build-style": "vite build --config vite.config.convention-test.ts",
-    "build": "vite-lit-ssg build",
+    "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
