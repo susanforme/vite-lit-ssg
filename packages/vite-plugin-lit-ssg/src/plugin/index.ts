@@ -2,7 +2,7 @@ import { createRequire } from 'node:module'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
 import MagicString from 'magic-string'
 import * as ts from 'typescript'
-import type { ConfigEnv, Plugin, ResolvedConfig, UserConfig, ViteDevServer } from 'vite'
+import type { Plugin, ResolvedConfig, UserConfig, ViteDevServer } from 'vite'
 import type { CommonStylesOptions, LitSSGOptionsNew, ResolvedSingleComponentOptions } from '../types.js'
 import { resolveSingleComponentOptions } from '../types.js'
 import type { PageEntry, ScanPagesOptions } from '../scanner/pages.js'
@@ -611,11 +611,10 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     name: PLUGIN_NAME,
     enforce: 'pre',
 
-    async config(userConfig: UserConfig, { command, isSsrBuild }: ConfigEnv) {
+    config(_userConfig: UserConfig) {
       const nodePath = _require.resolve('@lit-labs/ssr-client/lit-element-hydrate-support.js')
       const browserHydratePath = join(dirname(nodePath), '..', 'lit-element-hydrate-support.js')
-
-      const base: Omit<UserConfig, 'plugins'> = {
+      return {
         build: {
           manifest: true,
         },
@@ -632,52 +631,44 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           },
         },
       }
-
-      if (command !== 'build' || isSsrBuild) return base
-
-      const projectRoot = resolve(userConfig.root ?? process.cwd())
-      if (_ssgActive.has(projectRoot)) return base
-
-      if (state.kind === 'single-component') {
-        return {
-          ...base,
-          build: {
-            ...base.build,
-            rollupOptions: {
-              input: { 'lit-ssg-single': VIRTUAL_SINGLE_CLIENT_ID },
-            },
-          },
-        }
-      }
-
-      const { scanPages } = await import('../scanner/pages.js')
-      const pages = await scanPages(projectRoot, state.scanOptions)
-      state.pages = pages
-      syncPageTargets(state)
-
-      const pageInputs: Record<string, string> = {}
-      for (const page of pages) {
-        const key = page.slug.replace(/\//g, '-')
-        pageInputs[key] = `${VIRTUAL_PAGE_PREFIX}${page.slug}`
-      }
-
-      return {
-        ...base,
-        build: {
-          ...base.build,
-          rollupOptions: {
-            input: {
-              'lit-ssg-shared': VIRTUAL_SHARED_ID,
-              ...pageInputs,
-            },
-          },
-        },
-      }
     },
 
     configResolved(config) {
       state.resolvedConfig = config
       updateResolvedPaths(state, config.root ?? process.cwd())
+    },
+
+    async options(rollupOptions) {
+      const config = state.resolvedConfig
+      if (!config) return
+      if (config.build?.ssr) return
+      if (config.command !== 'build') return
+
+      const projectRoot = config.root
+      if (_ssgActive.has(projectRoot)) return
+
+      if (state.kind === 'single-component') {
+        return {
+          ...rollupOptions,
+          input: { 'lit-ssg-single': VIRTUAL_SINGLE_CLIENT_ID },
+        }
+      }
+
+      const { scanPages } = await import('../scanner/pages.js')
+      const { buildPageInputs } = await import('../runner/build.js')
+      const pages = await scanPages(projectRoot, state.scanOptions)
+      state.pages = pages
+      syncPageTargets(state)
+
+      const { pageInputs } = buildPageInputs(pages)
+
+      return {
+        ...rollupOptions,
+        input: {
+          'lit-ssg-shared': VIRTUAL_SHARED_ID,
+          ...pageInputs,
+        },
+      }
     },
 
     async buildStart() {
