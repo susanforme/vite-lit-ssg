@@ -99,7 +99,9 @@ export async function renderDevSingleComponent(
   const serverEntry = await loadDevServerEntry(server, VIRTUAL_SINGLE_SERVER_ID)
   const result = await serverEntry.render('/', { route: '/', params: {} })
 
-  if (result === null || result === undefined) return ''
+  if (result === null || result === undefined) {
+    throw new Error('[vite-plugin-lit-ssg] single-component SSR dev render returned null — component may not be registered')
+  }
 
   const { renderComponent } = await import('../runtime/render-component.js')
 
