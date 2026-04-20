@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module'
+import { pathToFileURL } from 'node:url'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
 import MagicString from 'magic-string'
 import * as ts from 'typescript'
@@ -1025,8 +1026,8 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       if (id === RESOLVED_VIRTUAL_SINGLE_SERVER_ID) {
         if (state.kind !== 'single-component') return undefined
         if (state.resolvedConfig?.command === 'serve') {
-          const ssrIndexPath = _require.resolve('@lit-labs/ssr')
-          const ssrRenderResultPath = _require.resolve('@lit-labs/ssr/lib/render-result.js')
+          const ssrIndexPath = pathToFileURL(_require.resolve('@lit-labs/ssr')).href
+          const ssrRenderResultPath = pathToFileURL(_require.resolve('@lit-labs/ssr/lib/render-result.js')).href
           const { generateDevSingleServerEntry } = await import('../virtual/single-server-entry.js')
           return generateDevSingleServerEntry(state.resolved, ssrIndexPath, ssrRenderResultPath)
         }
@@ -1045,8 +1046,8 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       if (id === RESOLVED_VIRTUAL_SERVER_ID) {
         if (state.kind !== 'page') return undefined
         if (state.resolvedConfig?.command === 'serve') {
-          const ssrIndexPath = _require.resolve('@lit-labs/ssr')
-          const ssrRenderResultPath = _require.resolve('@lit-labs/ssr/lib/render-result.js')
+          const ssrIndexPath = pathToFileURL(_require.resolve('@lit-labs/ssr')).href
+          const ssrRenderResultPath = pathToFileURL(_require.resolve('@lit-labs/ssr/lib/render-result.js')).href
           const { generateDevServerEntry } = await import('../virtual/server-entry.js')
           return generateDevServerEntry(state.pages, ssrIndexPath, ssrRenderResultPath)
         }
