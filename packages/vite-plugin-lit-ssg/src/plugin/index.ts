@@ -1,7 +1,6 @@
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
-import { realpathSync } from 'node:fs'
 import MagicString from 'magic-string'
 import * as ts from 'typescript'
 import type { Plugin, ResolvedConfig, UserConfig, ViteDevServer } from 'vite'
@@ -582,7 +581,6 @@ async function resolveQueuedTargets(
 
 export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
   let state: PluginState
-  let canonicalLitHtmlDir: string | null = null
 
   if (options.mode === 'single-component') {
     state = {
@@ -617,29 +615,6 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     config(_userConfig: UserConfig) {
       const nodePath = _require.resolve('@lit-labs/ssr-client/lit-element-hydrate-support.js')
       const browserHydratePath = join(dirname(nodePath), '..', 'lit-element-hydrate-support.js')
-
-      let litHtmlCanonicalDir: string | null = null
-      try {
-        const projectRequire = createRequire(join(_userConfig.root ?? process.cwd(), 'package.json'))
-        const litDir = dirname(projectRequire.resolve('lit'))
-        litHtmlCanonicalDir = realpathSync(join(litDir, '..', 'lit-html'))
-      } catch {
-      }
-
-      const litHtmlEsbuildPlugin = litHtmlCanonicalDir
-        ? [
-            {
-              name: 'lit-ssg-lit-html-singleton',
-              setup(build: any) {
-                build.onResolve({ filter: /^lit-html(\/|$)/ }, (args: any) => {
-                  if (args.path === 'lit-html') return { path: join(litHtmlCanonicalDir!, 'lit-html.js') }
-                  return { path: join(litHtmlCanonicalDir!, args.path.slice('lit-html/'.length)) }
-                })
-              },
-            },
-          ]
-        : []
-
       return {
         build: {
           manifest: true,
@@ -651,14 +626,21 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             },
           },
         },
-        optimizeDeps: {
-          esbuildOptions: {
-            plugins: litHtmlEsbuildPlugin,
-          },
-        },
         resolve: {
           alias: {
             '@lit-labs/ssr-client/lit-element-hydrate-support.js': browserHydratePath,
+          },
+        },
+        environments: {
+          client: {
+            resolve: {
+              dedupe: [
+                'lit',
+                'lit-html',
+                'lit-element',
+                '@lit/reactive-element',
+              ],
+            },
           },
         },
       }
@@ -666,15 +648,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
     configResolved(config) {
       state.resolvedConfig = config
-      const root = config.root ?? process.cwd()
-      updateResolvedPaths(state, root)
-      try {
-        const projectRequire = createRequire(join(root, 'package.json'))
-        const litDir = dirname(projectRequire.resolve('lit'))
-        canonicalLitHtmlDir = realpathSync(join(litDir, '..', 'lit-html'))
-      } catch {
-        canonicalLitHtmlDir = null
-      }
+      updateResolvedPaths(state, config.root ?? process.cwd())
     },
 
     async options(rollupOptions) {
@@ -1028,12 +1002,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       )
     },
 
-    resolveId(id, _importer, opts) {
-      const isSSRContext = Boolean(state.resolvedConfig?.build?.ssr) || opts?.ssr === true
-      if (!isSSRContext && canonicalLitHtmlDir) {
-        if (id === 'lit-html') return join(canonicalLitHtmlDir, 'lit-html.js')
-        if (id.startsWith('lit-html/')) return join(canonicalLitHtmlDir, id.slice('lit-html/'.length))
-      }
+    resolveId(id) {
       if (state.kind === 'single-component') {
         if (id === VIRTUAL_SINGLE_CLIENT_ID) return RESOLVED_VIRTUAL_SINGLE_CLIENT_ID
         if (id === VIRTUAL_SINGLE_SERVER_ID) return RESOLVED_VIRTUAL_SINGLE_SERVER_ID
