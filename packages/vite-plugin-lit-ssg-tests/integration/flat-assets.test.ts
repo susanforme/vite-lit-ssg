@@ -47,4 +47,9 @@ describe('flat asset output', () => {
     expect(html).not.toContain('assets/lit-ssg-page/')
     expect(html).toMatch(/assets\/about-[^/]+\.js/)
   })
+
+  it('commonStyles does not emit standalone CSS assets', () => {
+    const files = readdirSync(DIST_ASSETS)
+    expect(files.some((file) => file.endsWith('.css'))).toBe(false)
+  })
 })
