@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
+import { realpathSync } from 'node:fs'
 import MagicString from 'magic-string'
 import * as ts from 'typescript'
 import type { Plugin, ResolvedConfig, UserConfig, ViteDevServer } from 'vite'
@@ -616,6 +617,29 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     config(_userConfig: UserConfig) {
       const nodePath = _require.resolve('@lit-labs/ssr-client/lit-element-hydrate-support.js')
       const browserHydratePath = join(dirname(nodePath), '..', 'lit-element-hydrate-support.js')
+
+      let litHtmlCanonicalDir: string | null = null
+      try {
+        const projectRequire = createRequire(join(_userConfig.root ?? process.cwd(), 'package.json'))
+        const litDir = dirname(projectRequire.resolve('lit'))
+        litHtmlCanonicalDir = realpathSync(join(litDir, '..', 'lit-html'))
+      } catch {
+      }
+
+      const litHtmlEsbuildPlugin = litHtmlCanonicalDir
+        ? [
+            {
+              name: 'lit-ssg-lit-html-singleton',
+              setup(build: any) {
+                build.onResolve({ filter: /^lit-html(\/|$)/ }, (args: any) => {
+                  if (args.path === 'lit-html') return { path: join(litHtmlCanonicalDir!, 'lit-html.js') }
+                  return { path: join(litHtmlCanonicalDir!, args.path.slice('lit-html/'.length)) }
+                })
+              },
+            },
+          ]
+        : []
+
       return {
         build: {
           manifest: true,
@@ -625,6 +649,11 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             compilerOptions: {
               experimentalDecorators: true,
             },
+          },
+        },
+        optimizeDeps: {
+          esbuildOptions: {
+            plugins: litHtmlEsbuildPlugin,
           },
         },
         resolve: {
@@ -642,7 +671,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       try {
         const projectRequire = createRequire(join(root, 'package.json'))
         const litDir = dirname(projectRequire.resolve('lit'))
-        canonicalLitHtmlDir = join(litDir, '..', 'lit-html')
+        canonicalLitHtmlDir = realpathSync(join(litDir, '..', 'lit-html'))
       } catch {
         canonicalLitHtmlDir = null
       }
