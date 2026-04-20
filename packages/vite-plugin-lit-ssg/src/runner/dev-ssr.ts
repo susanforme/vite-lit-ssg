@@ -113,12 +113,14 @@ export async function renderDevSingleComponent(
     ? `<style>${wrapperTag}[dsd-pending]{display:none}</style>`
     : ''
 
+  const wrapperOpenTag = dsdPendingStyle ? `<${wrapperTag} dsd-pending>` : `<${wrapperTag}>`
+
   const { buildDsdPolyfillScriptsForWrapper } = await import('../runtime/dsd-polyfill.js')
   const polyfillScripts = await buildDsdPolyfillScriptsForWrapper(wrapperTag, dsdPendingStyle)
 
   return [
     dsdStyle,
-    `<${wrapperTag} dsd-pending>${innerContent}</${wrapperTag}>`,
+    `${wrapperOpenTag}${innerContent}</${wrapperTag}>`,
     polyfillScripts,
   ].filter(Boolean).join('\n')
 }
