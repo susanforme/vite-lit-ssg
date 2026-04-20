@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { execSync } from 'node:child_process'
-import { readFile, rm } from 'node:fs/promises'
+import { readFile, readdir, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 
@@ -46,11 +46,25 @@ describe('SSG convention-based integration', () => {
     expect(content).toContain('<script type="module"')
   })
 
+  it('index.html contains prepended common component styles before local styles', async () => {
+    const content = await readFile(join(DIST_DIR, 'index.html'), 'utf-8')
+    expect(content).toContain('chartreuse')
+    expect(content).toContain('color:red')
+    expect(content.indexOf('chartreuse')).toBeLessThan(content.indexOf('color:red'))
+  })
+
   it('about page has correct content and title from defineLitRoute', async () => {
     const content = await readFile(join(DIST_DIR, 'about', 'index.html'), 'utf-8')
     expect(content).toContain('<title>About | vite-plugin-lit-ssg</title>')
     expect(content).toContain('<about-page')
     expect(content).toContain('Build-time prerendering')
+  })
+
+  it('about page applies common styles through static get styles()', async () => {
+    const content = await readFile(join(DIST_DIR, 'about', 'index.html'), 'utf-8')
+    expect(content).toContain('chartreuse')
+    expect(content).toContain('rebeccapurple')
+    expect(content.indexOf('chartreuse')).toBeLessThan(content.indexOf('rebeccapurple'))
   })
 
   it('about page injects meta description from defineLitRoute', async () => {
@@ -82,5 +96,18 @@ describe('SSG convention-based integration', () => {
   it('index.html has DSD polyfill inline script', async () => {
     const content = await readFile(join(DIST_DIR, 'index.html'), 'utf-8')
     expect(content).toContain('hydrateShadowRoots')
+  })
+
+  it('commonStyles does not create top-level stylesheet links', async () => {
+    const content = await readFile(join(DIST_DIR, 'index.html'), 'utf-8')
+    expect(content).not.toContain('rel="stylesheet"')
+  })
+
+  it('built client hydration bundle also contains the common style marker', async () => {
+    const assetsDir = join(DIST_DIR, 'assets')
+    const files = (await readdir(assetsDir)).filter((file) => file.endsWith('.js'))
+    const bundleContents = await Promise.all(files.map((file) => readFile(join(assetsDir, file), 'utf-8')))
+    const combined = bundleContents.join('\n')
+    expect(combined).toContain('chartreuse')
   })
 })

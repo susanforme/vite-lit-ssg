@@ -17,6 +17,7 @@ describe('single-component dev mode — HTML shell (base=/)', () => {
       plugins: [litSSG({
         mode: 'single-component',
         entry: 'src/demo-widget.ts',
+        commonStyles: [{ file: 'src/common.css' }],
         wrapperTag: 'demo-app-root',
       })],
       server: { port: 0 },
@@ -45,6 +46,17 @@ describe('single-component dev mode — HTML shell (base=/)', () => {
     const html = await res.text()
     expect(html).toContain('type="module"')
   })
+
+  it('serves transformed entry module without raw decorator syntax', async () => {
+    const res = await fetch(`http://localhost:${port}/src/demo-widget.ts`)
+    expect(res.status).toBe(200)
+    const moduleCode = await res.text()
+    expect(moduleCode).not.toContain('@customElement(')
+    expect(moduleCode).toContain('demo-widget')
+    expect(moduleCode).toContain('?inline')
+    expect(moduleCode).toContain('__litSsgCommonStyles')
+    expect(moduleCode).toContain('unsafeCSS')
+  })
 })
 
 describe('single-component dev mode — HTML shell (base=/demo/)', () => {
@@ -58,6 +70,7 @@ describe('single-component dev mode — HTML shell (base=/demo/)', () => {
       plugins: [litSSG({
         mode: 'single-component',
         entry: 'src/demo-widget.ts',
+        commonStyles: [{ file: 'src/common.css' }],
         wrapperTag: 'demo-app-root',
       })],
       server: { port: 0 },

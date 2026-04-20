@@ -52,6 +52,13 @@ describe('single-component SSG integration', () => {
     expect(content).toContain('shadowrootmode')
   })
 
+  it('index.html contains prepended common component styles before local styles', async () => {
+    const content = await readFile(join(DIST_INHERIT, 'index.html'), 'utf-8')
+    expect(content).toContain('chartreuse')
+    expect(content).toContain('color: blue;')
+    expect(content.indexOf('chartreuse')).toBeLessThan(content.indexOf('color: blue;'))
+  })
+
   it('index.html has no html shell (no doctype, no <html>, no <body>)', async () => {
     const content = await readFile(join(DIST_INHERIT, 'index.html'), 'utf-8')
     expect(content).not.toContain('<!doctype')
@@ -87,6 +94,16 @@ describe('single-component SSG integration', () => {
     )
     const combined = bundleContents.join('\n')
     expect(combined).toContain('litElementHydrateSupport')
+  })
+
+  it('built client hydration bundle also contains the common style marker', async () => {
+    const assetsDir = join(DIST_INHERIT, 'assets')
+    const files = await readdir(assetsDir)
+    const jsFiles = files.filter((f) => f.endsWith('.js'))
+    const bundleContents = await Promise.all(
+      jsFiles.map((f) => readFile(join(assetsDir, f), 'utf-8')),
+    )
+    expect(bundleContents.join('\n')).toContain('chartreuse')
   })
 })
 
@@ -125,6 +142,11 @@ describe('named export integration', () => {
     expect(content).toContain('demo-widget')
     expect(content).toContain('shadowrootmode')
   })
+
+  it('named export build also includes common styles', async () => {
+    const content = await readFile(join(DIST_NAMED, 'index.html'), 'utf-8')
+    expect(content).toContain('chartreuse')
+  })
 })
 
 describe('preload=none integration', () => {
@@ -154,6 +176,12 @@ describe('preload=none integration', () => {
   it('index.html has no modulepreload links', async () => {
     const content = await readFile(join(DIST_NONE, 'index.html'), 'utf-8')
     expect(content).not.toContain('rel="modulepreload"')
+  })
+
+  it('preload=none still keeps common styles inside component styles instead of stylesheet links', async () => {
+    const content = await readFile(join(DIST_NONE, 'index.html'), 'utf-8')
+    expect(content).toContain('chartreuse')
+    expect(content).not.toContain('rel="stylesheet"')
   })
 
   it('index.html has no html shell', async () => {
@@ -205,6 +233,11 @@ describe('preload=entry-only integration', () => {
   it('index.html has no stylesheet links', async () => {
     const content = await readFile(join(DIST_ENTRY_ONLY, 'index.html'), 'utf-8')
     expect(content).not.toContain('rel="stylesheet"')
+  })
+
+  it('preload=entry-only still keeps common styles inside component styles', async () => {
+    const content = await readFile(join(DIST_ENTRY_ONLY, 'index.html'), 'utf-8')
+    expect(content).toContain('chartreuse')
   })
 
   it('index.html has no html shell', async () => {

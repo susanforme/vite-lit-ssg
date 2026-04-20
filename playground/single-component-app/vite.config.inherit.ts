@@ -5,10 +5,11 @@ export default defineConfig({
   plugins: [litSSG({
     mode: 'single-component',
     entry: 'src/demo-widget.ts',
+    commonStyles: [{ file: 'src/common.css' }],
     wrapperTag: 'demo-app-root',
-    preload: 'none',
+    preload: 'inherit',
   })],
   build: {
-    outDir: 'temp/dist-test-none',
+    outDir: 'temp/dist-test-inherit',
   },
 })

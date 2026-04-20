@@ -4,33 +4,36 @@ import { defineLitRoute } from 'vite-plugin-lit-ssg'
 
 @customElement('about-page')
 export class AboutPage extends LitElement {
-  static styles = css`
-    :host {
-      display: block;
-      font-family: sans-serif;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 2rem;
-    }
+  static get styles() {
+    return css`
+      :host {
+        display: block;
+        font-family: sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
 
-    h1 {
-      color: #333;
-    }
+      h1 {
+        color: #333;
+      }
 
-    nav a {
-      margin-right: 1rem;
-      color: #0066cc;
-      text-decoration: none;
-    }
+      nav a {
+        margin-right: 1rem;
+        color: #0066cc;
+        text-decoration: none;
+      }
 
-    nav a:hover {
-      text-decoration: underline;
-    }
+      nav a:hover {
+        text-decoration: underline;
+      }
 
-    ul {
-      line-height: 1.8;
-    }
-  `
+      ul {
+        line-height: 1.8;
+        border-left: 3px solid rebeccapurple;
+      }
+    `
+  }
 
   render() {
     return html`

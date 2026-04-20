@@ -15,19 +15,6 @@ importers:
         specifier: ^5.7.0
         version: 5.9.3
 
-  packages/playground:
-    dependencies:
-      lit:
-        specifier: ^3.3.2
-        version: 3.3.2
-      vite-plugin-lit-ssg:
-        specifier: workspace:*
-        version: link:../vite-plugin-lit-ssg
-    devDependencies:
-      vite:
-        specifier: ^6.0.0
-        version: 6.4.2(@types/node@22.19.17)
-
   packages/vite-plugin-lit-ssg:
     dependencies:
       '@lit-labs/ssr':
@@ -39,9 +26,15 @@ importers:
       '@webcomponents/template-shadowroot':
         specifier: ^0.2.1
         version: 0.2.1
+      magic-string:
+        specifier: ^0.30.17
+        version: 0.30.21
       tinyglobby:
         specifier: ^0.2.16
         version: 0.2.16
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -49,9 +42,6 @@ importers:
       lit:
         specifier: ^3.3.2
         version: 3.3.2
-      typescript:
-        specifier: ^5.7.0
-        version: 5.9.3
       vite:
         specifier: ^6.0.0
         version: 6.4.2(@types/node@22.19.17)
@@ -78,14 +68,27 @@ importers:
         specifier: ^3.1.0
         version: 3.2.4(@types/node@22.19.17)
 
-  packages/vite-plugin-lit-ssg-tests/fixtures/single-component-app:
+  playground/page-mode:
     dependencies:
       lit:
         specifier: ^3.3.2
         version: 3.3.2
       vite-plugin-lit-ssg:
         specifier: workspace:*
-        version: link:../../../vite-plugin-lit-ssg
+        version: link:../../packages/vite-plugin-lit-ssg
+    devDependencies:
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.2(@types/node@22.19.17)
+
+  playground/single-component-app:
+    dependencies:
+      lit:
+        specifier: ^3.3.2
+        version: 3.3.2
+      vite-plugin-lit-ssg:
+        specifier: workspace:*
+        version: link:../../packages/vite-plugin-lit-ssg
     devDependencies:
       vite:
         specifier: ^6.0.0

@@ -2,13 +2,13 @@ import { defineConfig } from 'vite'
 import { litSSG } from 'vite-plugin-lit-ssg'
 
 export default defineConfig({
+  base: './',
   plugins: [litSSG({
-    mode: 'single-component',
-    entry: 'src/demo-widget.ts',
-    wrapperTag: 'demo-app-root',
-    preload: 'inherit',
+    commonStyles: [{
+      file: 'src/styles/common.css',
+    }],
   })],
   build: {
-    outDir: 'temp/dist-test-inherit',
+    outDir: 'temp/dist-convention-test',
   },
 })
