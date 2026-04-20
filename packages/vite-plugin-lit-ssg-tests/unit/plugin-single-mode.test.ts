@@ -92,7 +92,7 @@ describe('single-component dev middleware — base routing', () => {
     const res = makeRes()
     await invokeMiddleware(server as any, req as any, res as any, nextFn)
     expect(nextFn).not.toHaveBeenCalled()
-    expect(server.transformIndexHtml).toHaveBeenCalled()
+    expect(res.end).toHaveBeenCalled()
   })
 
   it('base=/demo/ : serves shell for /demo/', async () => {
@@ -101,7 +101,7 @@ describe('single-component dev middleware — base routing', () => {
     const res = makeRes()
     await invokeMiddleware(server as any, req as any, res as any, nextFn)
     expect(nextFn).not.toHaveBeenCalled()
-    expect(server.transformIndexHtml).toHaveBeenCalled()
+    expect(res.end).toHaveBeenCalled()
   })
 
   it('base=/demo/ : serves shell for /demo (without trailing slash)', async () => {
@@ -110,7 +110,7 @@ describe('single-component dev middleware — base routing', () => {
     const res = makeRes()
     await invokeMiddleware(server as any, req as any, res as any, nextFn)
     expect(nextFn).not.toHaveBeenCalled()
-    expect(server.transformIndexHtml).toHaveBeenCalled()
+    expect(res.end).toHaveBeenCalled()
   })
 
   it('base=/demo/ : does NOT serve shell for /', async () => {

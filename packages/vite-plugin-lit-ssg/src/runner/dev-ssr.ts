@@ -1,5 +1,4 @@
 import type { ViteDevServer } from 'vite'
-import type { PreloadPolicy } from '../types.js'
 import { VIRTUAL_SERVER_ID, VIRTUAL_SINGLE_SERVER_ID } from '../plugin/constants.js'
 
 interface DevServerMod {
@@ -94,7 +93,6 @@ export async function renderDevSingleComponent(
   devScriptSrc: string,
   injectPolyfill: boolean,
   dsdPendingStyle: boolean,
-  preload: PreloadPolicy,
 ): Promise<string> {
   const devMod = await loadDevMod(server, VIRTUAL_SINGLE_SERVER_ID)
   const appHtml = await devMod.renderToHtml('/', { route: '/', params: {} })

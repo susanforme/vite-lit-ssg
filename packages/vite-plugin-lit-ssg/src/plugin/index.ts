@@ -730,7 +730,6 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           if (!isRoot) return next()
 
           const hydrateScriptSrc = `/@id/__x00__${VIRTUAL_SINGLE_CLIENT_ID}`
-          const fallbackScriptSrc = `/@id/__x00__${VIRTUAL_SINGLE_DEV_ID}`
           const wrapperTag = typeof resolved.wrapperTag === 'function' ? resolved.wrapperTag() : resolved.wrapperTag
 
           try {
@@ -741,7 +740,6 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
               hydrateScriptSrc,
               resolved.injectPolyfill,
               resolved.dsdPendingStyle,
-              resolved.preload,
             )
             const htmlShell = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n${fragment}\n  </body>\n</html>`
             const transformed = await server.transformIndexHtml(rawUrl, htmlShell)
@@ -749,18 +747,15 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             res.statusCode = 200
             res.end(transformed)
           } catch (e) {
+            const errMsg = e instanceof Error ? e.message : String(e)
             server.config.logger.error(
-              `[vite-plugin-lit-ssg] SSR dev render failed, falling back to client-only: ${e instanceof Error ? e.message : String(e)}`,
+              `[vite-plugin-lit-ssg] SSR dev render failed, serving error page: ${errMsg}`,
             )
-            const htmlTemplate = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n    <script type="module" src="${fallbackScriptSrc}"></script>\n  </body>\n</html>`
-            try {
-              const transformed = await server.transformIndexHtml(rawUrl, htmlTemplate)
-              res.setHeader('Content-Type', 'text/html; charset=utf-8')
-              res.statusCode = 200
-              res.end(transformed)
-            } catch (e2) {
-              next(e2)
-            }
+            const safeMsg = errMsg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            const errHtml = `<!DOCTYPE html>\n<html>\n  <head><meta charset="UTF-8"><title>SSR Error</title></head>\n  <body><h1>[vite-plugin-lit-ssg] SSR render failed</h1><pre>${safeMsg}</pre></body>\n</html>`
+            res.setHeader('Content-Type', 'text/html; charset=utf-8')
+            res.statusCode = 500
+            res.end(errHtml)
           }
         })
         return
@@ -933,20 +928,16 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           res.statusCode = 200
           res.end(transformed)
         } catch (e) {
+            const errMsg = e instanceof Error ? e.message : String(e)
             server.config.logger.error(
-              `[vite-plugin-lit-ssg] SSR dev render failed for ${matchedPage.route}, falling back to client-only: ${e instanceof Error ? e.message : String(e)}`,
+              `[vite-plugin-lit-ssg] SSR dev render failed for ${matchedPage.route}: ${errMsg}`,
             )
-          const devPageId = `${VIRTUAL_DEV_PAGE_PREFIX}${matchedPage.route === '/' ? 'index' : matchedPage.route.slice(1)}`
-          const htmlTemplate = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n    <script type="module" src="/@id/__x00__${devPageId}"></script>\n  </body>\n</html>`
-          try {
-            const transformed = await server.transformIndexHtml(rawUrl, htmlTemplate)
+            const safeMsg = errMsg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            const errHtml = `<!DOCTYPE html>\n<html>\n  <head><meta charset="UTF-8"><title>SSR Error</title></head>\n  <body><h1>[vite-plugin-lit-ssg] SSR render failed for ${matchedPage.route}</h1><pre>${safeMsg}</pre></body>\n</html>`
             res.setHeader('Content-Type', 'text/html; charset=utf-8')
-            res.statusCode = 200
-            res.end(transformed)
-          } catch (e2) {
-            next(e2)
+            res.statusCode = 500
+            res.end(errHtml)
           }
-        }
       })
     },
 
