@@ -117,7 +117,7 @@ describe('commonStyles source transform', () => {
       'src/styles/common.css': ':host { border-top: 4px solid chartreuse; }',
       'src/pages/index.ts': `
 import { LitElement, css } from 'lit'
-import { defineLitRoute } from 'vite-plugin-lit-ssg'
+import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
 
 class HelperCard extends LitElement {
   static styles = css\`p { color: orange; }\`
@@ -153,7 +153,7 @@ export default defineLitRoute({
     const root = await createTempProject({
       'src/styles/common.css': ':host { border-top: 4px solid chartreuse; }',
       'src/pages/index.ts': `
-import { defineLitRoute } from 'vite-plugin-lit-ssg'
+import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
 import { ImportedPage } from '../shared/imported-page.js'
 
 export default defineLitRoute({

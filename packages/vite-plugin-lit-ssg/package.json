@@ -9,6 +9,9 @@
   "exports": {
     ".": {
       "import": "./src/index.ts"
+    },
+    "./browser": {
+      "import": "./src/browser.ts"
     }
   },
   "bin": {

@@ -6,6 +6,8 @@ import {
   type PageModeOptions,
   type SingleComponentOptions,
 } from 'vite-plugin-lit-ssg'
+import type { LitElement } from 'lit'
+import { defineLitRoute, type LitRoute } from 'vite-plugin-lit-ssg/browser'
 
 describe('public root API types', () => {
   it('accepts commonStyles through page-mode root exports', () => {
@@ -29,5 +31,16 @@ describe('public root API types', () => {
 
     const plugin = litSSG(publicOptions)
     expect(plugin.name).toBe('vite-plugin-lit-ssg')
+  })
+
+  it('exposes defineLitRoute through the browser subpath', () => {
+    const component = class BrowserPage {} as unknown as typeof LitElement
+
+    const route: LitRoute = {
+      component,
+      title: 'Browser route',
+    }
+
+    expect(defineLitRoute(route)).toBe(route)
   })
 })
