@@ -1,5 +1,5 @@
 import type { ViteDevServer } from 'vite'
-import { VIRTUAL_SERVER_ID, VIRTUAL_SINGLE_SERVER_ID } from '../plugin/constants.js'
+import { VIRTUAL_SERVER_ID, VIRTUAL_SINGLE_SERVER_ID } from '../plugin/constants'
 
 interface DevServerMod {
   renderToHtml: (url: string, ctx: { route: string; params: Record<string, string> }) => Promise<string | null>
@@ -64,7 +64,7 @@ export async function renderDevPage(
 
   let dsdPolyfillScripts = ''
   if (injectPolyfill) {
-    const { buildDsdPolyfillScripts } = await import('../runtime/dsd-polyfill.js')
+  const { buildDsdPolyfillScripts } = await import('../runtime/dsd-polyfill')
     dsdPolyfillScripts = await buildDsdPolyfillScripts()
   }
 
@@ -115,7 +115,7 @@ export async function renderDevSingleComponent(
 
   const wrapperOpenTag = dsdPendingStyle ? `<${wrapperTag} dsd-pending>` : `<${wrapperTag}>`
 
-  const { buildDsdPolyfillScriptsForWrapper } = await import('../runtime/dsd-polyfill.js')
+  const { buildDsdPolyfillScriptsForWrapper } = await import('../runtime/dsd-polyfill')
   const polyfillScripts = await buildDsdPolyfillScriptsForWrapper(wrapperTag, dsdPendingStyle)
 
   return [
