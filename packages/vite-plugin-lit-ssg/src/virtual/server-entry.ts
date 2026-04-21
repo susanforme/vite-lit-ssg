@@ -1,4 +1,4 @@
-import type { PageEntry } from '../scanner/pages.js'
+import type { PageEntry } from '../scanner/pages'
 
 export function generateServerEntry(pages: PageEntry[]): string {
   const imports = pages

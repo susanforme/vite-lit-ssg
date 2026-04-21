@@ -1,5 +1,5 @@
-import type { ResolvedSingleComponentOptions } from '../types.js'
-import { resolveEntryPath } from './single-client-entry.js'
+import type { ResolvedSingleComponentOptions } from '../types'
+import { resolveEntryPath } from './single-client-entry'
 
 export function generateSingleServerEntry(opts: ResolvedSingleComponentOptions): string {
   const entryPath = resolveEntryPath(opts.entry)

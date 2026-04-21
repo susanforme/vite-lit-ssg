@@ -1,8 +1,8 @@
 import { render } from '@lit-labs/ssr'
 import { collectResult } from '@lit-labs/ssr/lib/render-result.js'
-import type { AssetLinks, PageRenderResult } from '../types.js'
-import { normalizePage } from './normalize-page.js'
-import { buildDsdPolyfillScripts } from './dsd-polyfill.js'
+import type { AssetLinks, PageRenderResult } from '../types'
+import { normalizePage } from './normalize-page'
+import { buildDsdPolyfillScripts } from './dsd-polyfill'
 
 const DSD_PENDING_STYLE = `  <style>body[dsd-pending]{display:none}</style>`
 

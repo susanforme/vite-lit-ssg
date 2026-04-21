@@ -20,8 +20,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "dev": "tsc -p tsconfig.build.json --watch",
+    "build": "node ./scripts/build-rspack.mjs && tsc -p tsconfig.build.json",
+    "dev": "rspack build --config rspack.config.mjs --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
   },
@@ -34,6 +34,8 @@
     "tinyglobby": "^0.2.16"
   },
   "devDependencies": {
+    "@rspack/cli": "^1.7.11",
+    "@rspack/core": "^1.7.11",
     "@types/node": "^22.0.0",
     "lit": "^3.3.2",
     "vite": "^6.0.0"

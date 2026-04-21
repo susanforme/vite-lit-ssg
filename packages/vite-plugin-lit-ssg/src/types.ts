@@ -108,7 +108,7 @@ export interface ManifestEntry {
  */
 export type ViteManifest = Record<string, ManifestEntry>
 
-import type { IgnoreOption } from './scanner/pages.js'
+import type { IgnoreOption } from './scanner/pages'
 
 export type { IgnoreOption }
 

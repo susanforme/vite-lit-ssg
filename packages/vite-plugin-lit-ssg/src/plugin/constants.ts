@@ -16,4 +16,12 @@ export const RESOLVED_VIRTUAL_SINGLE_SERVER_ID = '\0' + VIRTUAL_SINGLE_SERVER_ID
 export const VIRTUAL_SINGLE_DEV_ID = 'virtual:lit-ssg-single-dev'
 export const RESOLVED_VIRTUAL_SINGLE_DEV_ID = '\0' + VIRTUAL_SINGLE_DEV_ID
 
-export const _ssgActive = new Set<string>()
+const ACTIVE_BUILD_KEY = '__vitePluginLitSsgActiveBuilds'
+
+type GlobalWithActiveBuilds = typeof globalThis & {
+  [ACTIVE_BUILD_KEY]?: Set<string>
+}
+
+const globalWithActiveBuilds = globalThis as GlobalWithActiveBuilds
+
+export const _ssgActive = globalWithActiveBuilds[ACTIVE_BUILD_KEY] ??= new Set<string>()
