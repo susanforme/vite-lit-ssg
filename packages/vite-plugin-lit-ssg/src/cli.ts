@@ -2,10 +2,10 @@
 import { resolve } from 'node:path'
 import { loadConfigFromFile } from 'vite'
 import type { Plugin } from 'vite'
-import { PLUGIN_NAME, getSSGOptions, getSingleComponentOptions, getPageInjectPolyfill } from './plugin/index.js'
-import { runSSG } from './runner/build.js'
-import { runSingleSSG } from './runner/build-single.js'
-import { scanPages } from './scanner/pages.js'
+import { PLUGIN_NAME, getSSGOptions, getSingleComponentOptions, getPageInjectPolyfill } from './plugin/index'
+import { runSSG } from './runner/build'
+import { runSingleSSG } from './runner/build-single'
+import { scanPages } from './scanner/pages'
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2)
