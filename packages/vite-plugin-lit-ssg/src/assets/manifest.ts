@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { AssetLinks, ViteManifest } from '../types.js'
+import type { AssetLinks, ViteManifest } from '../types'
 
 export async function readManifest(outDir: string): Promise<ViteManifest> {
   const manifestPath = join(outDir, '.vite', 'manifest.json')
