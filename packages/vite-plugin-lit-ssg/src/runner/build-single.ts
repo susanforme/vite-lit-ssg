@@ -1,9 +1,9 @@
 import { resolve } from 'node:path'
 import { build } from 'vite'
-import type { ResolvedSingleComponentOptions } from '../types.js'
-import { _ssgActive, VIRTUAL_SINGLE_CLIENT_ID } from '../plugin/constants.js'
-import { runSingleSSRRender } from './ssr-render.js'
-import type { BuildContext } from './build.js'
+import type { ResolvedSingleComponentOptions } from '../types'
+import { _ssgActive, VIRTUAL_SINGLE_CLIENT_ID } from '../plugin/constants'
+import { runSingleSSRRender } from './ssr-render'
+import type { BuildContext } from './build'
 
 export async function runSingleSSG(
   opts: ResolvedSingleComponentOptions,
