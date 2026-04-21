@@ -1,3 +1,4 @@
+import { rspack } from '@rspack/core'
 import { readFileSync } from 'node:fs'
 import { builtinModules } from 'node:module'
 import { dirname, resolve } from 'node:path'
@@ -23,6 +24,16 @@ function isExternalRequest(request) {
     }
   }
   return false
+}
+
+function createExternals() {
+  return [({ request }, callback) => {
+    if (isExternalRequest(request)) {
+      callback(null, request)
+      return
+    }
+    callback()
+  }]
 }
 
 const commonConfig = {
@@ -62,35 +73,102 @@ const commonConfig = {
   },
 }
 
-const nodeLibraryConfig = {
-  ...commonConfig,
-  target: 'node18',
-  entry: {
-    index: './src/index.ts',
-    browser: './src/browser.ts',
-    cli: './src/cli.ts',
-  },
-  output: {
-    path: resolve(packageDir, 'dist'),
-    clean: true,
-    filename: '[name].js',
-    chunkFilename: 'chunks/[name]-[contenthash:8].js',
-    module: true,
-    chunkFormat: 'module',
-    chunkLoading: 'import',
-    workerChunkLoading: 'import',
-    library: {
-      type: 'module',
+function createNodeLibraryConfig({ clean = false } = {}) {
+  return {
+    ...commonConfig,
+    name: 'node-library',
+    target: 'node18',
+    entry: {
+      index: './src/index.ts',
     },
-  },
-  externalsType: 'module',
-  externals: [({ request }, callback) => {
-    if (isExternalRequest(request)) {
-      callback(null, request)
-      return
-    }
-    callback()
-  }],
+    output: {
+      path: resolve(packageDir, 'dist'),
+      clean,
+      filename: '[name].cjs',
+      chunkFilename: 'chunks/[name]-[contenthash:8].cjs',
+      chunkFormat: 'commonjs',
+      chunkLoading: 'require',
+      workerChunkLoading: 'require',
+      library: {
+        type: 'commonjs-static',
+      },
+    },
+    externalsType: 'commonjs',
+    externals: createExternals(),
+  }
 }
 
-export default nodeLibraryConfig
+function createCliConfig() {
+  return {
+    ...commonConfig,
+    name: 'cli',
+    target: 'node18',
+    entry: {
+      cli: './src/cli.ts',
+    },
+    output: {
+      path: resolve(packageDir, 'dist'),
+      clean: false,
+      filename: '[name].cjs',
+      chunkFilename: 'chunks/[name]-[contenthash:8].cjs',
+      chunkFormat: 'commonjs',
+      chunkLoading: 'require',
+      workerChunkLoading: 'require',
+    },
+    externalsType: 'commonjs',
+    externals: createExternals(),
+    plugins: [
+      new rspack.BannerPlugin({
+        banner: '#!/usr/bin/env node',
+        raw: true,
+        entryOnly: true,
+      }),
+    ],
+  }
+}
+
+function createBrowserConfig() {
+  return {
+    ...commonConfig,
+    name: 'browser',
+    target: 'web',
+    entry: {
+      browser: './src/browser.ts',
+      'runtime/hydrate-support-proxy': './src/runtime/hydrate-support-proxy.ts',
+    },
+    output: {
+      path: resolve(packageDir, 'dist'),
+      clean: false,
+      filename: '[name].js',
+      chunkFilename: 'chunks/[name]-[contenthash:8].js',
+      module: true,
+      chunkFormat: 'module',
+      chunkLoading: 'import',
+      workerChunkLoading: 'import',
+      library: {
+        type: 'modern-module',
+      },
+    },
+    externalsType: 'module-import',
+    externals: createExternals(),
+  }
+}
+
+export default (env = {}) => {
+  const clean = env.clean === true || env.clean === 'true'
+
+  switch (env.kind) {
+    case 'node-library':
+      return createNodeLibraryConfig({ clean })
+    case 'cli':
+      return createCliConfig()
+    case 'browser':
+      return createBrowserConfig()
+    default:
+      return [
+        createNodeLibraryConfig(),
+        createCliConfig(),
+        createBrowserConfig(),
+      ]
+  }
+}

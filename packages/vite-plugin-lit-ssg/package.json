@@ -3,25 +3,29 @@
   "version": "0.1.0",
   "description": "Vite plugin for Lit static site generation",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
+  "main": "./dist/index.cjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.cjs",
+      "require": "./dist/index.cjs",
+      "default": "./dist/index.cjs"
     },
     "./browser": {
-      "import": "./src/browser.ts"
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js",
+      "default": "./dist/browser.js"
     }
   },
   "bin": {
-    "vite-lit-ssg": "./dist/cli.js"
+    "vite-lit-ssg": "./dist/cli.cjs"
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "node ./scripts/build-rspack.mjs && tsc -p tsconfig.build.json",
+    "build": "rspack build --config rspack.config.mjs --env kind=node-library --env clean=true && rspack build --config rspack.config.mjs --env kind=cli && rspack build --config rspack.config.mjs --env kind=browser && tsc -p tsconfig.build.json",
     "dev": "rspack build --config rspack.config.mjs --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src"
