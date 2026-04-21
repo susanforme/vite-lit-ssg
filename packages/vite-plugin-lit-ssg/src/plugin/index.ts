@@ -1,12 +1,12 @@
-import { createRequire } from 'node:module'
-import { pathToFileURL } from 'node:url'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
 import MagicString from 'magic-string'
 import * as ts from 'typescript'
 import type { Plugin, ResolvedConfig, UserConfig, ViteDevServer } from 'vite'
-import type { CommonStylesOptions, LitSSGOptionsNew, ResolvedSingleComponentOptions } from '../types.js'
-import { resolveSingleComponentOptions } from '../types.js'
-import type { PageEntry, ScanPagesOptions } from '../scanner/pages.js'
+import type { CommonStylesOptions, LitSSGOptionsNew, ResolvedSingleComponentOptions } from '../types'
+import { resolveSingleComponentOptions } from '../types'
+import type { PageEntry, ScanPagesOptions } from '../scanner/pages'
 import {
   _ssgActive,
   PLUGIN_NAME,
@@ -24,9 +24,165 @@ import {
   VIRTUAL_SINGLE_CLIENT_ID,
   VIRTUAL_SINGLE_DEV_ID,
   VIRTUAL_SINGLE_SERVER_ID,
-} from './constants.js'
+} from './constants'
 
-const _require = createRequire(import.meta.url)
+function resolvePackageUrl(specifier: string): string {
+  return pathToFileURL(resolvePackageFilePath(specifier)).href
+}
+
+function resolveCurrentPackageRoot(): string {
+  let currentDir = dirname(fileURLToPath(import.meta.url))
+
+  while (true) {
+    const packageJsonPath = join(currentDir, 'package.json')
+    if (existsSync(packageJsonPath)) return currentDir
+
+    const parentDir = dirname(currentDir)
+    if (parentDir === currentDir) break
+    currentDir = parentDir
+  }
+
+  throw new Error(`[vite-plugin-lit-ssg] Could not resolve package root from ${import.meta.url}.`)
+}
+
+function resolvePackageInternalModulePath(sourceRelativePath: string, distRelativePath: string): string {
+  const packageRoot = resolveCurrentPackageRoot()
+  const candidates = [
+    join(packageRoot, distRelativePath),
+    join(packageRoot, sourceRelativePath),
+  ]
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+
+  throw new Error(
+    `[vite-plugin-lit-ssg] Could not resolve internal module. Tried: ${candidates.join(', ')}`,
+  )
+}
+
+function resolveInstalledPackageDir(packageName: string): string {
+  let currentDir = dirname(fileURLToPath(import.meta.url))
+
+  while (true) {
+    const candidate = join(currentDir, 'node_modules', packageName)
+    if (existsSync(candidate)) return candidate
+
+    const parentDir = dirname(currentDir)
+    if (parentDir === currentDir) break
+    currentDir = parentDir
+  }
+
+  throw new Error(`[vite-plugin-lit-ssg] Could not resolve installed package "${packageName}" from ${import.meta.url}.`)
+}
+
+function resolveSiblingPackageFilePath(
+  fromPackageName: string,
+  siblingPackageName: string,
+  siblingSubpath: string,
+): string {
+  const fromPackageDir = resolveInstalledPackageDir(fromPackageName)
+
+  const getNodeModulesDir = (packageDir: string): string => {
+    return fromPackageName.startsWith('@')
+      ? dirname(dirname(packageDir))
+      : dirname(packageDir)
+  }
+
+  const candidates = [
+    join(getNodeModulesDir(fromPackageDir), siblingPackageName, siblingSubpath),
+    join(getNodeModulesDir(realpathSync(fromPackageDir)), siblingPackageName, siblingSubpath),
+  ]
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+
+  throw new Error(
+    `[vite-plugin-lit-ssg] Could not resolve sibling package file for ${fromPackageName} -> ${siblingPackageName}/${siblingSubpath}. Tried: ${candidates.join(', ')}`,
+  )
+}
+
+function getHydrationImporterPackage(importer: string | undefined): 'lit' | 'lit-element' | '@lit-labs/ssr-client' | undefined {
+  if (!importer) return undefined
+  if (importer.includes('/@lit-labs/ssr-client/')) return '@lit-labs/ssr-client'
+  if (importer.includes('/node_modules/lit-element/')) return 'lit-element'
+  if (importer.includes('/node_modules/lit/')) return 'lit'
+  return undefined
+}
+
+function resolveHydrationDependency(id: string, importer: string | undefined): string | undefined {
+  const importerPackage = getHydrationImporterPackage(importer)
+  if (!importerPackage) return undefined
+
+  if (id === 'lit-html') {
+    return resolveSiblingPackageFilePath(importerPackage, 'lit-html', 'lit-html.js')
+  }
+
+  if (id.startsWith('lit-html/')) {
+    return resolveSiblingPackageFilePath(importerPackage, 'lit-html', id.slice('lit-html/'.length))
+  }
+
+  if (importerPackage === 'lit' || importerPackage === 'lit-element') {
+    const litDependencyAnchor = 'lit'
+
+    if (id === '@lit/reactive-element') {
+      return resolveSiblingPackageFilePath(litDependencyAnchor, '@lit/reactive-element', 'reactive-element.js')
+    }
+
+    if (id.startsWith('@lit/reactive-element/')) {
+      return resolveSiblingPackageFilePath(litDependencyAnchor, '@lit/reactive-element', id.slice('@lit/reactive-element/'.length))
+    }
+
+    if (id.startsWith('lit-element/')) {
+      return resolveSiblingPackageFilePath(litDependencyAnchor, 'lit-element', id.slice('lit-element/'.length))
+    }
+  }
+
+  return undefined
+}
+
+
+function splitPackageSpecifier(specifier: string): { packageName: string, packageSubpath: string } {
+  const segments = specifier.split('/').filter(Boolean)
+  if (segments.length === 0) {
+    throw new Error('[vite-plugin-lit-ssg] Package specifier must not be empty.')
+  }
+
+  if (specifier.startsWith('@')) {
+    const [scope, name, ...rest] = segments
+    if (!scope || !name) {
+      throw new Error(`[vite-plugin-lit-ssg] Invalid scoped package specifier: ${specifier}`)
+    }
+    return {
+      packageName: `${scope}/${name}`,
+      packageSubpath: rest.join('/'),
+    }
+  }
+
+  const [name, ...rest] = segments
+  return {
+    packageName: name!,
+    packageSubpath: rest.join('/'),
+  }
+}
+
+function resolvePackageFilePath(specifier: string): string {
+  const { packageName, packageSubpath } = splitPackageSpecifier(specifier)
+  const packageDir = resolveInstalledPackageDir(packageName)
+
+  if (packageSubpath) {
+    return join(packageDir, packageSubpath)
+  }
+
+  const packageJsonPath = join(packageDir, 'package.json')
+  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as {
+    module?: string
+    main?: string
+  }
+  const entryFile = packageJson.module ?? packageJson.main ?? 'index.js'
+  return join(packageDir, entryFile)
+}
 
 const COMMON_STYLES_TEXT_IDENTIFIER = '__litSsgCommonCssText'
 const COMMON_STYLES_IDENTIFIER = '__litSsgCommonStyles'
@@ -64,7 +220,16 @@ interface SingleComponentState extends SharedTransformState {
 
 type PluginState = PageModeState | SingleComponentState
 
-const pluginState = new WeakMap<object, PluginState>()
+const PLUGIN_STATE_KEY = '__vitePluginLitSsgState'
+
+type PluginWithState = Plugin & {
+  [PLUGIN_STATE_KEY]?: PluginState
+}
+
+function getStoredPluginState(plugin: object): PluginState | undefined {
+  if (typeof plugin !== 'object' || plugin === null) return undefined
+  return (plugin as PluginWithState)[PLUGIN_STATE_KEY]
+}
 
 function normalizeFileId(id: string): string {
   const queryIdx = id.indexOf('?')
@@ -580,6 +745,13 @@ async function resolveQueuedTargets(
 }
 
 export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
+  const litDedupePackages = [
+    'lit',
+    'lit-html',
+    'lit-element',
+    '@lit/reactive-element',
+  ]
+
   let state: PluginState
 
   if (options.mode === 'single-component') {
@@ -608,13 +780,11 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     }
   }
 
-  const plugin: Plugin = {
+  const plugin: PluginWithState = {
     name: PLUGIN_NAME,
     enforce: 'pre',
 
     config(_userConfig: UserConfig) {
-      const nodePath = _require.resolve('@lit-labs/ssr-client/lit-element-hydrate-support.js')
-      const browserHydratePath = join(dirname(nodePath), '..', 'lit-element-hydrate-support.js')
       return {
         build: {
           manifest: true,
@@ -626,20 +796,10 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             },
           },
         },
-        resolve: {
-          alias: {
-            '@lit-labs/ssr-client/lit-element-hydrate-support.js': browserHydratePath,
-          },
-        },
         environments: {
           client: {
             resolve: {
-              dedupe: [
-                'lit',
-                'lit-html',
-                'lit-element',
-                '@lit/reactive-element',
-              ],
+              dedupe: litDedupePackages,
             },
           },
         },
@@ -667,8 +827,8 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         }
       }
 
-      const { scanPages } = await import('../scanner/pages.js')
-      const { buildPageInputs } = await import('../runner/build.js')
+      const { scanPages } = await import('../scanner/pages')
+      const { buildPageInputs } = await import('../runner/build')
       const pages = await scanPages(projectRoot, state.scanOptions)
       state.pages = pages
       syncPageTargets(state)
@@ -686,7 +846,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
     async buildStart() {
       if (state.kind === 'page' && state.pages.length === 0) {
-        const { scanPages } = await import('../scanner/pages.js')
+        const { scanPages } = await import('../scanner/pages')
         const root = state.resolvedConfig?.root ?? process.cwd()
         state.pages = await scanPages(root, state.scanOptions)
         syncPageTargets(state)
@@ -709,15 +869,15 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       const ctx = { mode, configFile }
 
       if (state.kind === 'single-component') {
-        const { runSingleSSRRender } = await import('../runner/ssr-render.js')
+        const { runSingleSSRRender } = await import('../runner/ssr-render')
         await runSingleSSRRender(state.resolved, projectRoot, base, outDir, ctx)
         console.log('[vite-lit-ssg] Done!')
         return
       }
 
       if (state.kind === 'page') {
-        const { buildPageInputs } = await import('../runner/build.js')
-        const { runSSRRender } = await import('../runner/ssr-render.js')
+        const { buildPageInputs } = await import('../runner/build')
+        const { runSSRRender } = await import('../runner/ssr-render')
         const pageInputResult = buildPageInputs(state.pages)
         await runSSRRender(state.pages, pageInputResult, projectRoot, base, outDir, ctx, state.injectPolyfill)
         console.log('[vite-lit-ssg] Done!')
@@ -745,7 +905,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           const wrapperTag = typeof resolved.wrapperTag === 'function' ? resolved.wrapperTag() : resolved.wrapperTag
 
           try {
-            const { renderDevSingleComponent } = await import('../runner/dev-ssr.js')
+            const { renderDevSingleComponent } = await import('../runner/dev-ssr')
             const fragment = await renderDevSingleComponent(
               server,
               wrapperTag,
@@ -778,7 +938,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
       const seedPages = async () => {
         if (state.kind === 'page' && state.pages.length === 0) {
-          const { scanPages } = await import('../scanner/pages.js')
+          const { scanPages } = await import('../scanner/pages')
           try {
             state.pages = await scanPages(root, state.scanOptions)
             syncPageTargets(state)
@@ -793,7 +953,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       const rescanPages = async (addedFile?: string) => {
         if (state.kind !== 'page') return
         await seedReady
-        const { scanPages } = await import('../scanner/pages.js')
+        const { scanPages } = await import('../scanner/pages')
         const prevRoutes = new Set(state.pages.map((p) => p.route))
         try {
           state.pages = await scanPages(root, state.scanOptions)
@@ -844,7 +1004,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next()
 
         if (state.pages.length === 0) {
-          const { scanPages } = await import('../scanner/pages.js')
+          const { scanPages } = await import('../scanner/pages')
           const resolvedRoot = state.resolvedConfig?.root ?? process.cwd()
           state.pages = await scanPages(resolvedRoot, state.scanOptions)
           syncPageTargets(state)
@@ -933,7 +1093,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         const injectPolyfill = (state as PageModeState).injectPolyfill
 
         try {
-          const { renderDevPage } = await import('../runner/dev-ssr.js')
+          const { renderDevPage } = await import('../runner/dev-ssr')
           const ssrHtml = await renderDevPage(server, matchedPage.route, hydrateScriptSrc, injectPolyfill)
           const transformed = await server.transformIndexHtml(rawUrl, ssrHtml)
           res.setHeader('Content-Type', 'text/html; charset=utf-8')
@@ -1002,7 +1162,12 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       )
     },
 
-    resolveId(id) {
+    resolveId(id, importer) {
+      if (state.resolvedConfig?.command === 'build') {
+        const resolvedHydrationDependency = resolveHydrationDependency(id, importer)
+        if (resolvedHydrationDependency) return resolvedHydrationDependency
+      }
+
       if (state.kind === 'single-component') {
         if (id === VIRTUAL_SINGLE_CLIENT_ID) return RESOLVED_VIRTUAL_SINGLE_CLIENT_ID
         if (id === VIRTUAL_SINGLE_SERVER_ID) return RESOLVED_VIRTUAL_SINGLE_SERVER_ID
@@ -1021,40 +1186,45 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     },
 
     async load(id) {
+      const browserHydratePath = resolvePackageInternalModulePath(
+        'src/runtime/hydrate-support-proxy.ts',
+        'dist/runtime/hydrate-support-proxy.js',
+      )
+
       if (id === RESOLVED_VIRTUAL_SINGLE_CLIENT_ID) {
         if (state.kind !== 'single-component') return undefined
-        const { generateSingleClientEntry } = await import('../virtual/single-client-entry.js')
-        return generateSingleClientEntry(state.resolved)
+        const { generateSingleClientEntry } = await import('../virtual/single-client-entry')
+        return generateSingleClientEntry(state.resolved, browserHydratePath)
       }
-      if (id === RESOLVED_VIRTUAL_SINGLE_SERVER_ID) {
-        if (state.kind !== 'single-component') return undefined
-        if (state.resolvedConfig?.command === 'serve') {
-          const ssrIndexPath = pathToFileURL(_require.resolve('@lit-labs/ssr')).href
-          const ssrRenderResultPath = pathToFileURL(_require.resolve('@lit-labs/ssr/lib/render-result.js')).href
-          const { generateDevSingleServerEntry } = await import('../virtual/single-server-entry.js')
-          return generateDevSingleServerEntry(state.resolved, ssrIndexPath, ssrRenderResultPath)
-        }
-        const { generateSingleServerEntry } = await import('../virtual/single-server-entry.js')
-        return generateSingleServerEntry(state.resolved)
+        if (id === RESOLVED_VIRTUAL_SINGLE_SERVER_ID) {
+          if (state.kind !== 'single-component') return undefined
+          if (state.resolvedConfig?.command === 'serve') {
+            const { generateDevSingleServerEntry } = await import('../virtual/single-server-entry')
+            const ssrIndexPath = resolvePackageUrl('@lit-labs/ssr')
+            const ssrRenderResultPath = resolvePackageUrl('@lit-labs/ssr/lib/render-result.js')
+            return generateDevSingleServerEntry(state.resolved, ssrIndexPath, ssrRenderResultPath)
+          }
+          const { generateSingleServerEntry } = await import('../virtual/single-server-entry')
+          return generateSingleServerEntry(state.resolved)
       }
       if (id === RESOLVED_VIRTUAL_SINGLE_DEV_ID) {
         if (state.kind !== 'single-component') return undefined
-        const { generateSingleDevEntry } = await import('../virtual/single-client-entry.js')
-        return generateSingleDevEntry(state.resolved)
+        const { generateSingleDevEntry } = await import('../virtual/single-client-entry')
+        return generateSingleDevEntry(state.resolved, browserHydratePath)
       }
       if (id === RESOLVED_VIRTUAL_SHARED_ID) {
-        const { generateSharedEntry } = await import('../virtual/client-entry.js')
-        return generateSharedEntry()
+        const { generateSharedEntry } = await import('../virtual/client-entry')
+        return generateSharedEntry(browserHydratePath)
       }
-      if (id === RESOLVED_VIRTUAL_SERVER_ID) {
-        if (state.kind !== 'page') return undefined
-        if (state.resolvedConfig?.command === 'serve') {
-          const ssrIndexPath = pathToFileURL(_require.resolve('@lit-labs/ssr')).href
-          const ssrRenderResultPath = pathToFileURL(_require.resolve('@lit-labs/ssr/lib/render-result.js')).href
-          const { generateDevServerEntry } = await import('../virtual/server-entry.js')
-          return generateDevServerEntry(state.pages, ssrIndexPath, ssrRenderResultPath)
-        }
-        const { generateServerEntry } = await import('../virtual/server-entry.js')
+        if (id === RESOLVED_VIRTUAL_SERVER_ID) {
+          if (state.kind !== 'page') return undefined
+          if (state.resolvedConfig?.command === 'serve') {
+            const { generateDevServerEntry } = await import('../virtual/server-entry')
+            const ssrIndexPath = resolvePackageUrl('@lit-labs/ssr')
+            const ssrRenderResultPath = resolvePackageUrl('@lit-labs/ssr/lib/render-result.js')
+            return generateDevServerEntry(state.pages, ssrIndexPath, ssrRenderResultPath)
+          }
+        const { generateServerEntry } = await import('../virtual/server-entry')
         return generateServerEntry(state.pages)
       }
       if (id.startsWith(RESOLVED_VIRTUAL_PAGE_PREFIX)) {
@@ -1066,8 +1236,8 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             `[vite-plugin-lit-ssg] No page found for virtual module: ${id}. Available pages: ${state.pages.map((entry) => entry.importPath).join(', ')}`,
           )
         }
-        const { generatePageEntry } = await import('../virtual/client-entry.js')
-        return generatePageEntry(page)
+        const { generatePageEntry } = await import('../virtual/client-entry')
+        return generatePageEntry(page, browserHydratePath)
       }
       if (id.startsWith(RESOLVED_VIRTUAL_DEV_PAGE_PREFIX)) {
         if (state.kind !== 'page') return undefined
@@ -1081,7 +1251,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             `[vite-plugin-lit-ssg] No dev page found for: ${id}. Available pages: ${state.pages.map((entry) => entry.route).join(', ')}`,
           )
         }
-        return `import '@lit-labs/ssr-client/lit-element-hydrate-support.js'
+        return `import ${JSON.stringify(browserHydratePath)}
 import route from '${page.importPath}'
 if (route.title) document.title = route.title
 const tag = customElements.getName(route.component)
@@ -1095,25 +1265,28 @@ if (tag) {
     },
   }
 
-  pluginState.set(plugin, state)
+  Object.defineProperty(plugin, PLUGIN_STATE_KEY, {
+    value: state,
+    enumerable: false,
+  })
 
   return plugin
 }
 
 export function getSSGOptions(plugin: object): ScanPagesOptions | undefined {
-  const state = pluginState.get(plugin)
+  const state = getStoredPluginState(plugin)
   if (!state || state.kind !== 'page') return undefined
   return state.scanOptions
 }
 
 export function getPageInjectPolyfill(plugin: object): boolean {
-  const state = pluginState.get(plugin)
+  const state = getStoredPluginState(plugin)
   if (!state || state.kind !== 'page') return true
   return state.injectPolyfill
 }
 
 export function getSingleComponentOptions(plugin: object): ResolvedSingleComponentOptions | undefined {
-  const state = pluginState.get(plugin)
+  const state = getStoredPluginState(plugin)
   if (!state || state.kind !== 'single-component') return undefined
   return state.resolved
 }
