@@ -74,7 +74,7 @@ describe('page-mode dev mode — SSR rendering', () => {
         'src/pages/index.ts': `
 import { LitElement, css, html } from 'lit'
 import { customElement } from 'lit/decorators.js'
-import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
+import { defineLitRoute } from '../../../../../vite-plugin-lit-ssg/src/browser.js'
 
 @customElement('compression-page')
 export class CompressionPage extends LitElement {
@@ -111,7 +111,6 @@ export default defineLitRoute({
         const compressionPort = (compressionServer.httpServer!.address() as AddressInfo).port
         const res = await fetch(`http://localhost:${compressionPort}/`)
         expect(res.status).toBe(200)
-
         const html = await res.text()
         expect(html).toContain('<style>.card{color:red}</style>')
         expect(html).toContain('<div class="card">Compressed</div>')
