@@ -1,5 +1,5 @@
 {
-  "name": "vite-plugin-lit-ssg",
+  "name": "@cherrywind/vite-plugin-lit-ssg",
   "version": "0.0.1-alpha.1",
   "description": "Vite plugin for Lit static site generation",
   "type": "module",
