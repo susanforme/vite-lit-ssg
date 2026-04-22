@@ -37,14 +37,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build package
+        run: pnpm --filter vite-plugin-lit-ssg build
+
       - name: Type-check package
         run: pnpm --filter vite-plugin-lit-ssg typecheck
 
       - name: Run test suite
         run: pnpm test
-
-      - name: Build package
-        run: pnpm --filter vite-plugin-lit-ssg build
 
       - name: Create release PR or publish to npm
         id: changesets
