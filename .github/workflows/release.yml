@@ -46,14 +46,11 @@ jobs:
       - name: Run test suite
         run: pnpm test
 
-      - name: Create release PR or publish to npm
-        id: changesets
+      - name: Publish to npm
         uses: changesets/action@v1
         with:
-          version: pnpm version-packages
           publish: pnpm release
-          commit: "chore: release vite-plugin-lit-ssg"
-          title: "chore: release vite-plugin-lit-ssg"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
