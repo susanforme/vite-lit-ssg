@@ -50,7 +50,6 @@ jobs:
 
       - name: Configure npm registry auth
         run: pnpm config set //registry.npmjs.org/:_authToken ${{ secrets.NPM_TOKEN }}
-      - run: npm whoami
 
       - name: Publish to npm
         uses: changesets/action@v1
