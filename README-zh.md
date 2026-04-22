@@ -61,7 +61,7 @@ export default defineConfig({
 // src/pages/index.ts
 import { LitElement, html } from 'lit'
 import { customElement } from 'lit/decorators.js'
-import { defineLitRoute } from 'vite-plugin-lit-ssg'
+import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
 
 @customElement('home-page')
 export class HomePage extends LitElement {
@@ -81,7 +81,7 @@ export default defineLitRoute({
 // src/pages/about.ts
 import { LitElement, html } from 'lit'
 import { customElement } from 'lit/decorators.js'
-import { defineLitRoute } from 'vite-plugin-lit-ssg'
+import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
 
 @customElement('about-page')
 export class AboutPage extends LitElement {
@@ -141,7 +141,7 @@ vite-lit-ssg build --config vite.config.ts --mode production
 每个页面文件都必须默认导出一个 `defineLitRoute()` 调用：
 
 ```ts
-import { defineLitRoute } from 'vite-plugin-lit-ssg'
+import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
 
 export default defineLitRoute({
   component: MyComponent,   // 必填：你的 LitElement 类

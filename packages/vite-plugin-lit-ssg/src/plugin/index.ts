@@ -1,11 +1,13 @@
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
 import MagicString from 'magic-string'
 import * as ts from 'typescript'
 import type { Plugin, ResolvedConfig, UserConfig, ViteDevServer } from 'vite'
-import type { CommonStylesOptions, LitSSGOptionsNew, ResolvedSingleComponentOptions } from '../types.js'
-import { resolveSingleComponentOptions } from '../types.js'
-import type { PageEntry, ScanPagesOptions } from '../scanner/pages.js'
+import type { CommonStylesOptions, LitSSGOptionsNew, ResolvedSingleComponentOptions } from '../types'
+import { resolveSingleComponentOptions } from '../types'
+import type { PageEntry, ScanPagesOptions } from '../scanner/pages'
 import {
   _ssgActive,
   PLUGIN_NAME,
@@ -23,9 +25,204 @@ import {
   VIRTUAL_SINGLE_CLIENT_ID,
   VIRTUAL_SINGLE_DEV_ID,
   VIRTUAL_SINGLE_SERVER_ID,
-} from './constants.js'
+} from './constants'
+import {
+  classifyLitSourceCompressionTargets,
+  createLitSourceCompressionSourceFile,
+  minifyLitSourceCompressionTarget,
+  rewriteLitSourceCompressionCssFields,
+  rewriteLitSourceCompressionCssGetters,
+  rewriteLitSourceCompressionDynamicHtmlRenders,
+  rewriteLitSourceCompressionStaticHtmlRenders,
+} from './lit-source-compression'
 
-const _require = createRequire(import.meta.url)
+function resolvePackageUrl(specifier: string): string {
+  return pathToFileURL(resolvePackageFilePath(specifier)).href
+}
+
+function resolveCurrentPackageRoot(): string {
+  let currentDir = dirname(fileURLToPath(import.meta.url))
+
+  while (true) {
+    const packageJsonPath = join(currentDir, 'package.json')
+    if (existsSync(packageJsonPath)) return currentDir
+
+    const parentDir = dirname(currentDir)
+    if (parentDir === currentDir) break
+    currentDir = parentDir
+  }
+
+  throw new Error(`[vite-plugin-lit-ssg] Could not resolve package root from ${import.meta.url}.`)
+}
+
+function resolvePackageInternalModulePath(sourceRelativePath: string, distRelativePath: string): string {
+  const packageRoot = resolveCurrentPackageRoot()
+  const candidates = [
+    join(packageRoot, distRelativePath),
+    join(packageRoot, sourceRelativePath),
+  ]
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+
+  throw new Error(
+    `[vite-plugin-lit-ssg] Could not resolve internal module. Tried: ${candidates.join(', ')}`,
+  )
+}
+
+function resolveInstalledPackageDir(packageName: string): string {
+  let currentDir = dirname(fileURLToPath(import.meta.url))
+
+  while (true) {
+    const candidate = join(currentDir, 'node_modules', packageName)
+    if (existsSync(candidate)) return candidate
+
+    const parentDir = dirname(currentDir)
+    if (parentDir === currentDir) break
+    currentDir = parentDir
+  }
+
+  throw new Error(`[vite-plugin-lit-ssg] Could not resolve installed package "${packageName}" from ${import.meta.url}.`)
+}
+
+function resolveSiblingPackageFilePath(
+  fromPackageName: string,
+  siblingPackageName: string,
+  siblingSubpath: string,
+): string {
+  const fromPackageDir = resolveInstalledPackageDir(fromPackageName)
+
+  const getNodeModulesDir = (packageDir: string): string => {
+    return fromPackageName.startsWith('@')
+      ? dirname(dirname(packageDir))
+      : dirname(packageDir)
+  }
+
+  const candidates = [
+    join(getNodeModulesDir(fromPackageDir), siblingPackageName, siblingSubpath),
+    join(getNodeModulesDir(realpathSync(fromPackageDir)), siblingPackageName, siblingSubpath),
+  ]
+
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate
+  }
+
+  throw new Error(
+    `[vite-plugin-lit-ssg] Could not resolve sibling package file for ${fromPackageName} -> ${siblingPackageName}/${siblingSubpath}. Tried: ${candidates.join(', ')}`,
+  )
+}
+
+function getHydrationImporterPackage(importer: string | undefined): 'lit' | 'lit-element' | '@lit-labs/ssr-client' | undefined {
+  if (!importer) return undefined
+  if (importer.includes('/@lit-labs/ssr-client/')) return '@lit-labs/ssr-client'
+  if (importer.includes('/node_modules/lit-element/')) return 'lit-element'
+  if (importer.includes('/node_modules/lit/')) return 'lit'
+  return undefined
+}
+
+function resolveHydrationDependency(id: string, importer: string | undefined): string | undefined {
+  const importerPackage = getHydrationImporterPackage(importer)
+  if (!importerPackage || !importer) return undefined
+
+  const resolvePackageSubpathFromImporter = (packageName: string, subpath: string): string | undefined => {
+    try {
+      const resolvedEntry = createRequire(importer).resolve(packageName)
+      let currentDir = dirname(resolvedEntry)
+
+      while (true) {
+        const packageJsonPath = join(currentDir, 'package.json')
+        if (existsSync(packageJsonPath)) {
+          const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as { name?: string }
+          if (packageJson.name === packageName) {
+            return join(currentDir, subpath)
+          }
+        }
+
+        const parentDir = dirname(currentDir)
+        if (parentDir === currentDir) break
+        currentDir = parentDir
+      }
+    } catch (_error) {
+      return undefined
+    }
+
+    return undefined
+  }
+
+  if (id === 'lit-html') {
+    return resolvePackageSubpathFromImporter('lit-html', 'lit-html.js')
+      ?? resolveSiblingPackageFilePath(importerPackage, 'lit-html', 'lit-html.js')
+  }
+
+  if (id.startsWith('lit-html/')) {
+    return resolvePackageSubpathFromImporter('lit-html', id.slice('lit-html/'.length))
+      ?? resolveSiblingPackageFilePath(importerPackage, 'lit-html', id.slice('lit-html/'.length))
+  }
+
+  if (importerPackage === 'lit' || importerPackage === 'lit-element') {
+    const litDependencyAnchor = 'lit'
+
+    if (id === '@lit/reactive-element') {
+      return resolvePackageSubpathFromImporter('@lit/reactive-element', 'reactive-element.js')
+        ?? resolveSiblingPackageFilePath(litDependencyAnchor, '@lit/reactive-element', 'reactive-element.js')
+    }
+
+    if (id.startsWith('@lit/reactive-element/')) {
+      return resolvePackageSubpathFromImporter('@lit/reactive-element', id.slice('@lit/reactive-element/'.length))
+        ?? resolveSiblingPackageFilePath(litDependencyAnchor, '@lit/reactive-element', id.slice('@lit/reactive-element/'.length))
+    }
+
+    if (id.startsWith('lit-element/')) {
+      return resolvePackageSubpathFromImporter('lit-element', id.slice('lit-element/'.length))
+        ?? resolveSiblingPackageFilePath(litDependencyAnchor, 'lit-element', id.slice('lit-element/'.length))
+    }
+  }
+
+  return undefined
+}
+
+
+function splitPackageSpecifier(specifier: string): { packageName: string, packageSubpath: string } {
+  const segments = specifier.split('/').filter(Boolean)
+  if (segments.length === 0) {
+    throw new Error('[vite-plugin-lit-ssg] Package specifier must not be empty.')
+  }
+
+  if (specifier.startsWith('@')) {
+    const [scope, name, ...rest] = segments
+    if (!scope || !name) {
+      throw new Error(`[vite-plugin-lit-ssg] Invalid scoped package specifier: ${specifier}`)
+    }
+    return {
+      packageName: `${scope}/${name}`,
+      packageSubpath: rest.join('/'),
+    }
+  }
+
+  const [name, ...rest] = segments
+  return {
+    packageName: name!,
+    packageSubpath: rest.join('/'),
+  }
+}
+
+function resolvePackageFilePath(specifier: string): string {
+  const { packageName, packageSubpath } = splitPackageSpecifier(specifier)
+  const packageDir = resolveInstalledPackageDir(packageName)
+
+  if (packageSubpath) {
+    return join(packageDir, packageSubpath)
+  }
+
+  const packageJsonPath = join(packageDir, 'package.json')
+  const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as {
+    module?: string
+    main?: string
+  }
+  const entryFile = packageJson.module ?? packageJson.main ?? 'index.js'
+  return join(packageDir, entryFile)
+}
 
 const COMMON_STYLES_TEXT_IDENTIFIER = '__litSsgCommonCssText'
 const COMMON_STYLES_IDENTIFIER = '__litSsgCommonStyles'
@@ -63,7 +260,16 @@ interface SingleComponentState extends SharedTransformState {
 
 type PluginState = PageModeState | SingleComponentState
 
-const pluginState = new WeakMap<object, PluginState>()
+const PLUGIN_STATE_KEY = '__vitePluginLitSsgState'
+
+type PluginWithState = Plugin & {
+  [PLUGIN_STATE_KEY]?: PluginState
+}
+
+function getStoredPluginState(plugin: object): PluginState | undefined {
+  if (typeof plugin !== 'object' || plugin === null) return undefined
+  return (plugin as PluginWithState)[PLUGIN_STATE_KEY]
+}
 
 function normalizeFileId(id: string): string {
   const queryIdx = id.indexOf('?')
@@ -377,6 +583,64 @@ function prependCommonStyles(expression: ts.Expression, sourceFile: ts.SourceFil
   return `[...${COMMON_STYLES_IDENTIFIER}, ${expression.getText(sourceFile)}]`
 }
 
+interface LitSourceCompressionRewrite {
+  key: string
+  replacementText: string
+  start: number
+  end: number
+}
+
+function getLitSourceCompressionRewriteKey(start: number, end: number): string {
+  return `${start}:${end}`
+}
+
+function getExpressionRewriteKey(expression: ts.Expression, sourceFile: ts.SourceFile): string {
+  return getLitSourceCompressionRewriteKey(expression.getStart(sourceFile), expression.getEnd())
+}
+
+async function collectLitSourceCompressionRewrites(
+  fileName: string,
+  sourceFile: ts.SourceFile,
+): Promise<LitSourceCompressionRewrite[]> {
+  const { replacementTargets } = classifyLitSourceCompressionTargets(sourceFile)
+  const rewrites: LitSourceCompressionRewrite[] = []
+
+  for (const target of replacementTargets) {
+    const result = await minifyLitSourceCompressionTarget({
+      fileName,
+      kind: target.kind,
+      tagName: target.tagName,
+      text: target.text,
+    })
+
+    if (!result.changed) continue
+
+    rewrites.push({
+      key: getLitSourceCompressionRewriteKey(target.expressionRange.start, target.expressionRange.end),
+      replacementText: `${target.tagName}\`${result.text}\``,
+      start: target.expressionRange.start,
+      end: target.expressionRange.end,
+    })
+  }
+
+  return rewrites
+}
+
+function prependCommonStylesWithOptionalRewrite(
+  expression: ts.Expression,
+  sourceFile: ts.SourceFile,
+  replacementText?: string,
+): string {
+  if (ts.isArrayLiteralExpression(expression)) {
+    const elements = expression.elements.map((element) => element.getText(sourceFile))
+    return elements.length === 0
+      ? `[...${COMMON_STYLES_IDENTIFIER}]`
+      : `[...${COMMON_STYLES_IDENTIFIER}, ${elements.join(', ')}]`
+  }
+
+  return `[...${COMMON_STYLES_IDENTIFIER}, ${replacementText ?? expression.getText(sourceFile)}]`
+}
+
 function getLineIndentation(source: string, position: number): string {
   let lineStart = source.lastIndexOf('\n', position)
   lineStart = lineStart === -1 ? 0 : lineStart + 1
@@ -416,6 +680,8 @@ function rewriteTargetClass(
   source: string,
   sourceFile: ts.SourceFile,
   classDecl: ts.ClassDeclaration,
+  compressionRewrites: Map<string, string>,
+  consumedCompressionRewriteKeys: Set<string>,
 ): void {
   const stylesMember = classDecl.members.find(isStaticStylesMember)
 
@@ -429,10 +695,14 @@ function rewriteTargetClass(
       throw new Error('[vite-plugin-lit-ssg] commonStyles found a static styles field without an initializer, which is not supported.')
     }
 
+    const rewriteKey = getExpressionRewriteKey(stylesMember.initializer, sourceFile)
+    const replacementText = compressionRewrites.get(rewriteKey)
+    if (replacementText) consumedCompressionRewriteKeys.add(rewriteKey)
+
     magicString.overwrite(
       stylesMember.initializer.getStart(sourceFile),
       stylesMember.initializer.getEnd(),
-      prependCommonStyles(stylesMember.initializer, sourceFile),
+      prependCommonStylesWithOptionalRewrite(stylesMember.initializer, sourceFile, replacementText),
     )
     return
   }
@@ -443,10 +713,14 @@ function rewriteTargetClass(
     throw new Error('[vite-plugin-lit-ssg] commonStyles only supports static get styles() getters with a single return statement.')
   }
 
+  const rewriteKey = getExpressionRewriteKey(statement.expression, sourceFile)
+  const replacementText = compressionRewrites.get(rewriteKey)
+  if (replacementText) consumedCompressionRewriteKeys.add(rewriteKey)
+
   magicString.overwrite(
     statement.expression.getStart(sourceFile),
     statement.expression.getEnd(),
-    prependCommonStyles(statement.expression, sourceFile),
+    prependCommonStylesWithOptionalRewrite(statement.expression, sourceFile, replacementText),
   )
 }
 
@@ -478,12 +752,15 @@ function rewriteModuleWithCommonStyles(
   cleanId: string,
   commonStylesImports: string[],
   targetClassNames: Set<string>,
+  compressionRewrites: LitSourceCompressionRewrite[] = [],
 ): { code: string, map: ReturnType<MagicString['generateMap']> } | null {
-  if (targetClassNames.size === 0) return null
+  if (targetClassNames.size === 0 && compressionRewrites.length === 0) return null
 
   const classes = collectClassDeclarations(sourceFile)
   const litElementNames = collectLitElementImportNames(sourceFile)
   const magicString = new MagicString(code, { filename: cleanId })
+  const compressionRewriteMap = new Map(compressionRewrites.map((rewrite) => [rewrite.key, rewrite.replacementText]))
+  const consumedCompressionRewriteKeys = new Set<string>()
 
   for (const className of targetClassNames) {
     const classDecl = classes.get(className)
@@ -497,19 +774,85 @@ function rewriteModuleWithCommonStyles(
       )
     }
 
-    rewriteTargetClass(magicString, code, sourceFile, classDecl)
+    rewriteTargetClass(
+      magicString,
+      code,
+      sourceFile,
+      classDecl,
+      compressionRewriteMap,
+      consumedCompressionRewriteKeys,
+    )
   }
 
-  insertCommonStylesHelper(magicString, sourceFile, commonStylesImports)
+  for (const rewrite of [...compressionRewrites].reverse()) {
+    if (consumedCompressionRewriteKeys.has(rewrite.key)) continue
+    magicString.overwrite(rewrite.start, rewrite.end, rewrite.replacementText)
+  }
+
+  if (targetClassNames.size > 0) {
+    insertCommonStylesHelper(magicString, sourceFile, commonStylesImports)
+  }
+
+  const rewrittenCode = magicString.toString()
+  if (rewrittenCode === code) return null
 
   return {
-    code: magicString.toString(),
+    code: rewrittenCode,
     map: magicString.generateMap({
       source: cleanId,
       includeContent: true,
       hires: true,
     }),
   }
+}
+
+async function rewriteModuleWithPageSourceCompression(
+  code: string,
+  cleanId: string,
+  sourceFile: ts.SourceFile,
+): Promise<string | null> {
+  const replacementKinds = new Set(
+    classifyLitSourceCompressionTargets(sourceFile).replacementTargets.map((target) => target.kind),
+  )
+
+  if (replacementKinds.size === 0) return null
+
+  let rewrittenCode = code
+  let hasChanges = false
+
+  if (replacementKinds.has('css-field')) {
+    const result = await rewriteLitSourceCompressionCssFields(rewrittenCode, cleanId)
+    if (result) {
+      rewrittenCode = result.code
+      hasChanges = true
+    }
+  }
+
+  if (replacementKinds.has('css-getter')) {
+    const result = await rewriteLitSourceCompressionCssGetters(rewrittenCode, cleanId)
+    if (result) {
+      rewrittenCode = result.code
+      hasChanges = true
+    }
+  }
+
+  if (replacementKinds.has('html-render-static')) {
+    const result = await rewriteLitSourceCompressionStaticHtmlRenders(rewrittenCode, cleanId)
+    if (result) {
+      rewrittenCode = result.code
+      hasChanges = true
+    }
+  }
+
+  if (replacementKinds.has('html-render-dynamic')) {
+    const result = await rewriteLitSourceCompressionDynamicHtmlRenders(rewrittenCode, cleanId)
+    if (result) {
+      rewrittenCode = result.code
+      hasChanges = true
+    }
+  }
+
+  return hasChanges ? rewrittenCode : null
 }
 
 async function queueExternalTarget(
@@ -579,6 +922,13 @@ async function resolveQueuedTargets(
 }
 
 export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
+  const litDedupePackages = [
+    'lit',
+    'lit-html',
+    'lit-element',
+    '@lit/reactive-element',
+  ]
+
   let state: PluginState
 
   if (options.mode === 'single-component') {
@@ -607,13 +957,11 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     }
   }
 
-  const plugin: Plugin = {
+  const plugin: PluginWithState = {
     name: PLUGIN_NAME,
     enforce: 'pre',
 
     config(_userConfig: UserConfig) {
-      const nodePath = _require.resolve('@lit-labs/ssr-client/lit-element-hydrate-support.js')
-      const browserHydratePath = join(dirname(nodePath), '..', 'lit-element-hydrate-support.js')
       return {
         build: {
           manifest: true,
@@ -625,9 +973,11 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             },
           },
         },
-        resolve: {
-          alias: {
-            '@lit-labs/ssr-client/lit-element-hydrate-support.js': browserHydratePath,
+        environments: {
+          client: {
+            resolve: {
+              dedupe: litDedupePackages,
+            },
           },
         },
       }
@@ -654,8 +1004,8 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         }
       }
 
-      const { scanPages } = await import('../scanner/pages.js')
-      const { buildPageInputs } = await import('../runner/build.js')
+      const { scanPages } = await import('../scanner/pages')
+      const { buildPageInputs } = await import('../runner/build')
       const pages = await scanPages(projectRoot, state.scanOptions)
       state.pages = pages
       syncPageTargets(state)
@@ -673,14 +1023,14 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
     async buildStart() {
       if (state.kind === 'page' && state.pages.length === 0) {
-        const { scanPages } = await import('../scanner/pages.js')
+        const { scanPages } = await import('../scanner/pages')
         const root = state.resolvedConfig?.root ?? process.cwd()
         state.pages = await scanPages(root, state.scanOptions)
         syncPageTargets(state)
       }
     },
 
-    async closeBundle() {
+    async writeBundle() {
       const config = state.resolvedConfig
       if (!config) return
       if (config.build?.ssr) return
@@ -696,15 +1046,15 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       const ctx = { mode, configFile }
 
       if (state.kind === 'single-component') {
-        const { runSingleSSRRender } = await import('../runner/ssr-render.js')
+        const { runSingleSSRRender } = await import('../runner/ssr-render')
         await runSingleSSRRender(state.resolved, projectRoot, base, outDir, ctx)
         console.log('[vite-lit-ssg] Done!')
         return
       }
 
       if (state.kind === 'page') {
-        const { buildPageInputs } = await import('../runner/build.js')
-        const { runSSRRender } = await import('../runner/ssr-render.js')
+        const { buildPageInputs } = await import('../runner/build')
+        const { runSSRRender } = await import('../runner/ssr-render')
         const pageInputResult = buildPageInputs(state.pages)
         await runSSRRender(state.pages, pageInputResult, projectRoot, base, outDir, ctx, state.injectPolyfill)
         console.log('[vite-lit-ssg] Done!')
@@ -713,6 +1063,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
     configureServer(server: ViteDevServer) {
       if (state.kind === 'single-component') {
+        const resolved = state.resolved
         server.middlewares.use(async (req, res, next) => {
           const rawUrl = req.url ?? '/'
           const pathname = (rawUrl.split('?')[0] ?? '/').split('#')[0] ?? '/'
@@ -727,25 +1078,33 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             : pathname === base.replace(/\/$/, '') || pathname === normalizedBase
           if (!isRoot) return next()
 
-          const htmlTemplate = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dev</title>
-  </head>
-  <body>
-    <script type="module" src="/@id/__x00__${VIRTUAL_SINGLE_DEV_ID}"></script>
-  </body>
-</html>`
+          const hydrateScriptSrc = `/@id/__x00__${VIRTUAL_SINGLE_CLIENT_ID}`
+          const wrapperTag = typeof resolved.wrapperTag === 'function' ? resolved.wrapperTag() : resolved.wrapperTag
 
           try {
-            const transformed = await server.transformIndexHtml(rawUrl, htmlTemplate)
+            const { renderDevSingleComponent } = await import('../runner/dev-ssr')
+            const fragment = await renderDevSingleComponent(
+              server,
+              wrapperTag,
+              hydrateScriptSrc,
+              resolved.injectPolyfill,
+              resolved.dsdPendingStyle,
+            )
+            const htmlShell = `<!DOCTYPE html>\n<html>\n  <head>\n    <meta charset="UTF-8" />\n    <meta name="viewport" content="width=device-width, initial-scale=1.0" />\n    <title>Dev</title>\n  </head>\n  <body>\n${fragment}\n  </body>\n</html>`
+            const transformed = await server.transformIndexHtml(rawUrl, htmlShell)
             res.setHeader('Content-Type', 'text/html; charset=utf-8')
             res.statusCode = 200
             res.end(transformed)
           } catch (e) {
-            next(e)
+            const errMsg = e instanceof Error ? e.message : String(e)
+            server.config.logger.error(
+              `[vite-plugin-lit-ssg] SSR dev render failed, serving error page: ${errMsg}`,
+            )
+            const safeMsg = errMsg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            const errHtml = `<!DOCTYPE html>\n<html>\n  <head><meta charset="UTF-8"><title>SSR Error</title></head>\n  <body><h1>[vite-plugin-lit-ssg] SSR render failed</h1><pre>${safeMsg}</pre></body>\n</html>`
+            res.setHeader('Content-Type', 'text/html; charset=utf-8')
+            res.statusCode = 500
+            res.end(errHtml)
           }
         })
         return
@@ -756,7 +1115,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
       const seedPages = async () => {
         if (state.kind === 'page' && state.pages.length === 0) {
-          const { scanPages } = await import('../scanner/pages.js')
+          const { scanPages } = await import('../scanner/pages')
           try {
             state.pages = await scanPages(root, state.scanOptions)
             syncPageTargets(state)
@@ -771,7 +1130,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       const rescanPages = async (addedFile?: string) => {
         if (state.kind !== 'page') return
         await seedReady
-        const { scanPages } = await import('../scanner/pages.js')
+        const { scanPages } = await import('../scanner/pages')
         const prevRoutes = new Set(state.pages.map((p) => p.route))
         try {
           state.pages = await scanPages(root, state.scanOptions)
@@ -822,7 +1181,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         if (req.method !== 'GET' && req.method !== 'HEAD') return next()
 
         if (state.pages.length === 0) {
-          const { scanPages } = await import('../scanner/pages.js')
+          const { scanPages } = await import('../scanner/pages')
           const resolvedRoot = state.resolvedConfig?.root ?? process.cwd()
           state.pages = await scanPages(resolvedRoot, state.scanOptions)
           syncPageTargets(state)
@@ -907,80 +1266,125 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
           return
         }
 
-        const devPageId = `${VIRTUAL_DEV_PAGE_PREFIX}${matchedPage.route === '/' ? 'index' : matchedPage.route.slice(1)}`
-        const htmlTemplate = `<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dev</title>
-  </head>
-  <body>
-    <script type="module" src="/@id/__x00__${devPageId}"></script>
-  </body>
-</html>`
+        const hydrateScriptSrc = `/@id/__x00__${VIRTUAL_PAGE_PREFIX}${matchedPage.slug}`
+        const injectPolyfill = (state as PageModeState).injectPolyfill
 
         try {
-          const transformed = await server.transformIndexHtml(rawUrl, htmlTemplate)
+          const { renderDevPage } = await import('../runner/dev-ssr')
+          const ssrHtml = await renderDevPage(server, matchedPage.route, hydrateScriptSrc, injectPolyfill)
+          const transformed = await server.transformIndexHtml(rawUrl, ssrHtml)
           res.setHeader('Content-Type', 'text/html; charset=utf-8')
           res.statusCode = 200
           res.end(transformed)
         } catch (e) {
-          next(e)
-        }
+            const errMsg = e instanceof Error ? e.message : String(e)
+            server.config.logger.error(
+              `[vite-plugin-lit-ssg] SSR dev render failed for ${matchedPage.route}: ${errMsg}`,
+            )
+            const safeMsg = errMsg.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            const errHtml = `<!DOCTYPE html>\n<html>\n  <head><meta charset="UTF-8"><title>SSR Error</title></head>\n  <body><h1>[vite-plugin-lit-ssg] SSR render failed for ${matchedPage.route}</h1><pre>${safeMsg}</pre></body>\n</html>`
+            res.setHeader('Content-Type', 'text/html; charset=utf-8')
+            res.statusCode = 500
+            res.end(errHtml)
+          }
       })
     },
 
     async transform(code, id) {
       const cleanId = normalizeFileId(id)
-      const root = state.resolvedConfig?.root ?? process.cwd()
-      const commonStyleImports = resolveCommonStylesImports(root, state.commonStyles)
-
-      if (commonStyleImports.length === 0) return null
       if (!shouldHandleModule(cleanId)) return null
       if (id.includes('?inline')) return null
-      if (code.includes(`const ${COMMON_STYLES_IDENTIFIER} =`)) return null
+
+      const root = state.resolvedConfig?.root ?? process.cwd()
+      const commonStyleImports = resolveCommonStylesImports(root, state.commonStyles)
 
       const queuedTargets = state.transformTargets.get(cleanId) ?? []
       const isPageModule = state.kind === 'page' && state.pageModuleIds.has(cleanId)
       const isSingleEntry = state.kind === 'single-component' && state.entryModuleId === cleanId
 
-      if (!isPageModule && !isSingleEntry && queuedTargets.length === 0) {
+      const shouldApplyCommonStyles = commonStyleImports.length > 0
+        && !code.includes(`const ${COMMON_STYLES_IDENTIFIER} =`)
+        && (isPageModule || isSingleEntry || queuedTargets.length > 0)
+      const shouldApplySourceCompression = state.kind === 'page'
+        || isSingleEntry
+        || queuedTargets.length > 0
+
+      if (!shouldApplyCommonStyles && !shouldApplySourceCompression) {
         return null
       }
 
-      const sourceFile = createSourceFile(cleanId, code)
-      const localTargets = new Set<string>()
+      let transformedCode = code
+      let commonStylesResult: ReturnType<typeof rewriteModuleWithCommonStyles> | null = null
+      let compressionRewrites: LitSourceCompressionRewrite[] = []
 
-      if (isPageModule) {
-        const resolution = resolvePageComponentTarget(sourceFile)
-        await applyTargetResolution(this, state.transformTargets, cleanId, localTargets, resolution)
-      }
+      if (shouldApplyCommonStyles) {
+        const sourceFile = createSourceFile(cleanId, transformedCode)
+        const localTargets = new Set<string>()
 
-      if (isSingleEntry && state.kind === 'single-component') {
-        const resolution = resolveExportTarget(sourceFile, state.resolved.exportName)
-        if (!resolution) {
-          throw new Error(
-            `[vite-plugin-lit-ssg] commonStyles could not find export "${state.resolved.exportName}" in ${cleanId}.`,
-          )
+        if (state.kind === 'single-component') {
+          compressionRewrites = await collectLitSourceCompressionRewrites(cleanId, sourceFile)
         }
-        await applyTargetResolution(this, state.transformTargets, cleanId, localTargets, resolution)
+
+        if (isPageModule) {
+          const resolution = resolvePageComponentTarget(sourceFile)
+          await applyTargetResolution(this, state.transformTargets, cleanId, localTargets, resolution)
+        }
+
+        if (isSingleEntry && state.kind === 'single-component') {
+          const resolution = resolveExportTarget(sourceFile, state.resolved.exportName)
+          if (!resolution) {
+            throw new Error(
+              `[vite-plugin-lit-ssg] commonStyles could not find export "${state.resolved.exportName}" in ${cleanId}.`,
+            )
+          }
+          await applyTargetResolution(this, state.transformTargets, cleanId, localTargets, resolution)
+        }
+
+        if (queuedTargets.length > 0) {
+          await resolveQueuedTargets(this, state.transformTargets, sourceFile, cleanId, queuedTargets, localTargets)
+        }
+
+        commonStylesResult = rewriteModuleWithCommonStyles(
+          transformedCode,
+          sourceFile,
+          cleanId,
+          commonStyleImports,
+          localTargets,
+          compressionRewrites,
+        )
+
+        if (commonStylesResult) {
+          transformedCode = commonStylesResult.code
+        }
       }
 
-      if (queuedTargets.length > 0) {
-        await resolveQueuedTargets(this, state.transformTargets, sourceFile, cleanId, queuedTargets, localTargets)
+      if (!shouldApplySourceCompression) {
+        return commonStylesResult
       }
 
-      return rewriteModuleWithCommonStyles(
-        code,
-        sourceFile,
+      const compressionSourceFile = createLitSourceCompressionSourceFile(cleanId, transformedCode)
+      const compressedCode = await rewriteModuleWithPageSourceCompression(
+        transformedCode,
         cleanId,
-        commonStyleImports,
-        localTargets,
+        compressionSourceFile,
       )
+
+      if (compressedCode) {
+        return {
+          code: compressedCode,
+          map: null,
+        }
+      }
+
+      return commonStylesResult
     },
 
-    resolveId(id) {
+    resolveId(id, importer) {
+      if (state.resolvedConfig?.command === 'build') {
+        const resolvedHydrationDependency = resolveHydrationDependency(id, importer)
+        if (resolvedHydrationDependency) return resolvedHydrationDependency
+      }
+
       if (state.kind === 'single-component') {
         if (id === VIRTUAL_SINGLE_CLIENT_ID) return RESOLVED_VIRTUAL_SINGLE_CLIENT_ID
         if (id === VIRTUAL_SINGLE_SERVER_ID) return RESOLVED_VIRTUAL_SINGLE_SERVER_ID
@@ -999,28 +1403,45 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
     },
 
     async load(id) {
+      const browserHydratePath = resolvePackageInternalModulePath(
+        'src/runtime/hydrate-support-proxy.ts',
+        'dist/runtime/hydrate-support-proxy.js',
+      )
+
       if (id === RESOLVED_VIRTUAL_SINGLE_CLIENT_ID) {
         if (state.kind !== 'single-component') return undefined
-        const { generateSingleClientEntry } = await import('../virtual/single-client-entry.js')
-        return generateSingleClientEntry(state.resolved)
+        const { generateSingleClientEntry } = await import('../virtual/single-client-entry')
+        return generateSingleClientEntry(state.resolved, browserHydratePath)
       }
-      if (id === RESOLVED_VIRTUAL_SINGLE_SERVER_ID) {
-        if (state.kind !== 'single-component') return undefined
-        const { generateSingleServerEntry } = await import('../virtual/single-server-entry.js')
-        return generateSingleServerEntry(state.resolved)
+        if (id === RESOLVED_VIRTUAL_SINGLE_SERVER_ID) {
+          if (state.kind !== 'single-component') return undefined
+          if (state.resolvedConfig?.command === 'serve') {
+            const { generateDevSingleServerEntry } = await import('../virtual/single-server-entry')
+            const ssrIndexPath = resolvePackageUrl('@lit-labs/ssr')
+            const ssrRenderResultPath = resolvePackageUrl('@lit-labs/ssr/lib/render-result.js')
+            return generateDevSingleServerEntry(state.resolved, ssrIndexPath, ssrRenderResultPath)
+          }
+          const { generateSingleServerEntry } = await import('../virtual/single-server-entry')
+          return generateSingleServerEntry(state.resolved)
       }
       if (id === RESOLVED_VIRTUAL_SINGLE_DEV_ID) {
         if (state.kind !== 'single-component') return undefined
-        const { generateSingleDevEntry } = await import('../virtual/single-client-entry.js')
-        return generateSingleDevEntry(state.resolved)
+        const { generateSingleDevEntry } = await import('../virtual/single-client-entry')
+        return generateSingleDevEntry(state.resolved, browserHydratePath)
       }
       if (id === RESOLVED_VIRTUAL_SHARED_ID) {
-        const { generateSharedEntry } = await import('../virtual/client-entry.js')
-        return generateSharedEntry()
+        const { generateSharedEntry } = await import('../virtual/client-entry')
+        return generateSharedEntry(browserHydratePath)
       }
-      if (id === RESOLVED_VIRTUAL_SERVER_ID) {
-        if (state.kind !== 'page') return undefined
-        const { generateServerEntry } = await import('../virtual/server-entry.js')
+        if (id === RESOLVED_VIRTUAL_SERVER_ID) {
+          if (state.kind !== 'page') return undefined
+          if (state.resolvedConfig?.command === 'serve') {
+            const { generateDevServerEntry } = await import('../virtual/server-entry')
+            const ssrIndexPath = resolvePackageUrl('@lit-labs/ssr')
+            const ssrRenderResultPath = resolvePackageUrl('@lit-labs/ssr/lib/render-result.js')
+            return generateDevServerEntry(state.pages, ssrIndexPath, ssrRenderResultPath)
+          }
+        const { generateServerEntry } = await import('../virtual/server-entry')
         return generateServerEntry(state.pages)
       }
       if (id.startsWith(RESOLVED_VIRTUAL_PAGE_PREFIX)) {
@@ -1032,8 +1453,8 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             `[vite-plugin-lit-ssg] No page found for virtual module: ${id}. Available pages: ${state.pages.map((entry) => entry.importPath).join(', ')}`,
           )
         }
-        const { generatePageEntry } = await import('../virtual/client-entry.js')
-        return generatePageEntry(page)
+        const { generatePageEntry } = await import('../virtual/client-entry')
+        return generatePageEntry(page, browserHydratePath)
       }
       if (id.startsWith(RESOLVED_VIRTUAL_DEV_PAGE_PREFIX)) {
         if (state.kind !== 'page') return undefined
@@ -1047,7 +1468,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
             `[vite-plugin-lit-ssg] No dev page found for: ${id}. Available pages: ${state.pages.map((entry) => entry.route).join(', ')}`,
           )
         }
-        return `import '@lit-labs/ssr-client/lit-element-hydrate-support.js'
+        return `import ${JSON.stringify(browserHydratePath)}
 import route from '${page.importPath}'
 if (route.title) document.title = route.title
 const tag = customElements.getName(route.component)
@@ -1061,25 +1482,28 @@ if (tag) {
     },
   }
 
-  pluginState.set(plugin, state)
+  Object.defineProperty(plugin, PLUGIN_STATE_KEY, {
+    value: state,
+    enumerable: false,
+  })
 
   return plugin
 }
 
 export function getSSGOptions(plugin: object): ScanPagesOptions | undefined {
-  const state = pluginState.get(plugin)
+  const state = getStoredPluginState(plugin)
   if (!state || state.kind !== 'page') return undefined
   return state.scanOptions
 }
 
 export function getPageInjectPolyfill(plugin: object): boolean {
-  const state = pluginState.get(plugin)
+  const state = getStoredPluginState(plugin)
   if (!state || state.kind !== 'page') return true
   return state.injectPolyfill
 }
 
 export function getSingleComponentOptions(plugin: object): ResolvedSingleComponentOptions | undefined {
-  const state = pluginState.get(plugin)
+  const state = getStoredPluginState(plugin)
   if (!state || state.kind !== 'single-component') return undefined
   return state.resolved
 }

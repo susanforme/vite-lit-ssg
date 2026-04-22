@@ -1,8 +1,8 @@
 import { resolve } from 'node:path'
 import { build } from 'vite'
-import type { PageEntry } from '../scanner/pages.js'
-import { _ssgActive, VIRTUAL_PAGE_PREFIX, VIRTUAL_SHARED_ID } from '../plugin/constants.js'
-import { runSSRRender } from './ssr-render.js'
+import type { PageEntry } from '../scanner/pages'
+import { _ssgActive, VIRTUAL_PAGE_PREFIX, VIRTUAL_SHARED_ID } from '../plugin/constants'
+import { runSSRRender } from './ssr-render'
 
 export function slugToInputKey(slug: string): string {
   const key = slug.replace(/\//g, '-')

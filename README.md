@@ -61,7 +61,7 @@ export default defineConfig({
 // src/pages/index.ts
 import { LitElement, html } from 'lit'
 import { customElement } from 'lit/decorators.js'
-import { defineLitRoute } from 'vite-plugin-lit-ssg'
+import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
 
 @customElement('home-page')
 export class HomePage extends LitElement {
@@ -81,7 +81,7 @@ export default defineLitRoute({
 // src/pages/about.ts
 import { LitElement, html } from 'lit'
 import { customElement } from 'lit/decorators.js'
-import { defineLitRoute } from 'vite-plugin-lit-ssg'
+import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
 
 @customElement('about-page')
 export class AboutPage extends LitElement {
@@ -141,7 +141,7 @@ Place page modules in `src/pages/`. Subdirectories are supported — the directo
 Each page file must export a `defineLitRoute()` call as its default export:
 
 ```ts
-import { defineLitRoute } from 'vite-plugin-lit-ssg'
+import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
 
 export default defineLitRoute({
   component: MyComponent,   // required: your LitElement class

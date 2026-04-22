@@ -1,4 +1,4 @@
-export { litSSG } from './plugin/index.js'
+export { litSSG } from './plugin/index'
 export type {
   CommonStylesOptions,
   IgnoreOption,
@@ -13,6 +13,6 @@ export type {
   ServerEntry,
   SingleComponentOptions,
   AssetLinks,
-} from './types.js'
-export { defineLitRoute } from './define-route.js'
-export type { LitRoute } from './define-route.js'
+} from './types'
+export { defineLitRoute } from './define-route'
+export type { LitRoute } from './define-route'

@@ -1,4 +1,4 @@
-import type { LitSSGOptions } from '../types.js'
+import type { LitSSGOptions } from '../types'
 
 export async function resolveRoutes(
   routes: LitSSGOptions['routes'],

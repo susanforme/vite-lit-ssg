@@ -151,7 +151,7 @@ export interface LitRoute {
  * // src/pages/index.ts
  * import { LitElement, html } from 'lit'
  * import { customElement } from 'lit/decorators.js'
- * import { defineLitRoute } from 'vite-plugin-lit-ssg'
+ * import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
  *
  * \@customElement('home-page')
  * export class HomePage extends LitElement {

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.ts",
-    "build:inherit": "vite-lit-ssg build --config vite.config.ts",
+    "build": "vite build",
     "build:none": "vite-lit-ssg build --config vite.config.none.ts",
     "build:entry-only": "vite-lit-ssg build --config vite.config.entry-only.ts"
   },

@@ -1,17 +1,27 @@
-import type { ResolvedSingleComponentOptions } from '../types.js'
+import type { ResolvedSingleComponentOptions } from '../types'
 
-const HYDRATE_SUPPORT_IMPORT = `import '@lit-labs/ssr-client/lit-element-hydrate-support.js'`
+const DEFAULT_HYDRATE_SUPPORT_PATH = '@lit-labs/ssr-client/lit-element-hydrate-support.js'
+
+function getHydrateSupportImport(hydrateSupportPath: string): string {
+  return `import ${JSON.stringify(hydrateSupportPath)}`
+}
 
 export function resolveEntryPath(entry: string): string {
   return entry.startsWith('/') ? entry : `/${entry}`
 }
 
-export function generateSingleClientEntry(opts: ResolvedSingleComponentOptions): string {
+export function generateSingleClientEntry(
+  opts: ResolvedSingleComponentOptions,
+  hydrateSupportPath: string = DEFAULT_HYDRATE_SUPPORT_PATH,
+): string {
   const entryPath = resolveEntryPath(opts.entry)
-  return `${HYDRATE_SUPPORT_IMPORT}\nimport '${entryPath}'\n`
+  return `${getHydrateSupportImport(hydrateSupportPath)}\nimport '${entryPath}'\n`
 }
 
-export function generateSingleDevEntry(opts: ResolvedSingleComponentOptions): string {
+export function generateSingleDevEntry(
+  opts: ResolvedSingleComponentOptions,
+  hydrateSupportPath: string = DEFAULT_HYDRATE_SUPPORT_PATH,
+): string {
   const entryPath = resolveEntryPath(opts.entry)
   const exportClause = opts.exportName === 'default'
     ? `import componentExport from '${entryPath}'`
@@ -19,7 +29,7 @@ export function generateSingleDevEntry(opts: ResolvedSingleComponentOptions): st
 
   const wrapperTag = typeof opts.wrapperTag === 'function' ? opts.wrapperTag() : opts.wrapperTag
 
-  return `${HYDRATE_SUPPORT_IMPORT}
+  return `${getHydrateSupportImport(hydrateSupportPath)}
 ${exportClause}
 const tag = customElements.getName(componentExport)
 if (tag) {

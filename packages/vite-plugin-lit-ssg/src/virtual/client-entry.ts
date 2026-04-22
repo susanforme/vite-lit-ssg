@@ -1,11 +1,15 @@
-import type { PageEntry } from '../scanner/pages.js'
+import type { PageEntry } from '../scanner/pages'
 
-const HYDRATE_SUPPORT_IMPORT = `import '@lit-labs/ssr-client/lit-element-hydrate-support.js'`
+const DEFAULT_HYDRATE_SUPPORT_PATH = '@lit-labs/ssr-client/lit-element-hydrate-support.js'
 
-export function generateSharedEntry(): string {
-  return `${HYDRATE_SUPPORT_IMPORT}\n`
+function getHydrateSupportImport(hydrateSupportPath: string): string {
+  return `import ${JSON.stringify(hydrateSupportPath)}`
 }
 
-export function generatePageEntry(page: PageEntry): string {
-  return `${HYDRATE_SUPPORT_IMPORT}\nimport '${page.importPath}'\n`
+export function generateSharedEntry(hydrateSupportPath: string = DEFAULT_HYDRATE_SUPPORT_PATH): string {
+  return `${getHydrateSupportImport(hydrateSupportPath)}\n`
+}
+
+export function generatePageEntry(page: PageEntry, hydrateSupportPath: string = DEFAULT_HYDRATE_SUPPORT_PATH): string {
+  return `${getHydrateSupportImport(hydrateSupportPath)}\nimport '${page.importPath}'\n`
 }

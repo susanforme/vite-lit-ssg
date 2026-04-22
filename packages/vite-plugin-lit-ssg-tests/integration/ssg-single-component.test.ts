@@ -5,17 +5,22 @@ import { join, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 
 const FIXTURE_ROOT = resolve(import.meta.dirname, '../fixtures/single-component-app')
+const CLI_PATH = resolve(import.meta.dirname, '../../vite-plugin-lit-ssg/dist/cli.cjs')
 
 const DIST_INHERIT = join(FIXTURE_ROOT, 'temp', 'dist-test-inherit')
+
+function runFixtureBuild(configFile: string): void {
+  execSync(`${JSON.stringify(process.execPath)} ${JSON.stringify(CLI_PATH)} build --config ${configFile}`, {
+    cwd: FIXTURE_ROOT,
+    stdio: 'pipe',
+  })
+}
 
 describe('single-component SSG integration', () => {
   beforeAll(async () => {
     await rm(DIST_INHERIT, { recursive: true, force: true })
 
-    execSync('pnpm vite-lit-ssg build --config vite.config.ts', {
-      cwd: FIXTURE_ROOT,
-      stdio: 'pipe',
-    })
+    runFixtureBuild('vite.config.ts')
   }, 120_000)
 
   afterAll(async () => {
@@ -96,14 +101,18 @@ describe('single-component SSG integration', () => {
     expect(combined).toContain('litElementHydrateSupport')
   })
 
-  it('built client hydration bundle also contains the common style marker', async () => {
+  it('built client hydration bundle keeps the common style marker and minifies supported local templates', async () => {
     const assetsDir = join(DIST_INHERIT, 'assets')
     const files = await readdir(assetsDir)
     const jsFiles = files.filter((f) => f.endsWith('.js'))
     const bundleContents = await Promise.all(
       jsFiles.map((f) => readFile(join(assetsDir, f), 'utf-8')),
     )
-    expect(bundleContents.join('\n')).toContain('chartreuse')
+    const combined = bundleContents.join('\n')
+    expect(combined).toContain('chartreuse')
+    expect(combined).toMatch(/:host\{(?:display:block;font-family:sans-serif|font-family:sans-serif;display:block)\}p\{(?:color:blue|color:#00f)\}/)
+    expect(combined).not.toContain('font-family: sans-serif;')
+    expect(combined).not.toContain('p { color: blue; }')
   })
 })
 
@@ -112,10 +121,7 @@ describe('named export integration', () => {
 
   beforeAll(async () => {
     await rm(DIST_NAMED, { recursive: true, force: true })
-    execSync('pnpm vite-lit-ssg build --config vite.config.named-export.ts', {
-      cwd: FIXTURE_ROOT,
-      stdio: 'pipe',
-    })
+    runFixtureBuild('vite.config.named-export.ts')
   }, 120_000)
 
   afterAll(async () => {
@@ -154,10 +160,7 @@ describe('preload=none integration', () => {
 
   beforeAll(async () => {
     await rm(DIST_NONE, { recursive: true, force: true })
-    execSync('pnpm vite-lit-ssg build --config vite.config.none.ts', {
-      cwd: FIXTURE_ROOT,
-      stdio: 'pipe',
-    })
+    runFixtureBuild('vite.config.none.ts')
   }, 120_000)
 
   afterAll(async () => {
@@ -206,10 +209,7 @@ describe('preload=entry-only integration', () => {
 
   beforeAll(async () => {
     await rm(DIST_ENTRY_ONLY, { recursive: true, force: true })
-    execSync('pnpm vite-lit-ssg build --config vite.config.entry-only.ts', {
-      cwd: FIXTURE_ROOT,
-      stdio: 'pipe',
-    })
+    runFixtureBuild('vite.config.entry-only.ts')
   }, 120_000)
 
   afterAll(async () => {

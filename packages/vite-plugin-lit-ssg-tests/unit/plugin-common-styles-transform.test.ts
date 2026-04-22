@@ -117,7 +117,7 @@ describe('commonStyles source transform', () => {
       'src/styles/common.css': ':host { border-top: 4px solid chartreuse; }',
       'src/pages/index.ts': `
 import { LitElement, css } from 'lit'
-import { defineLitRoute } from 'vite-plugin-lit-ssg'
+import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
 
 class HelperCard extends LitElement {
   static styles = css\`p { color: orange; }\`
@@ -145,7 +145,7 @@ export default defineLitRoute({
     expect(transformed).toContain("import __litSsgCommonCssText0 from '/src/styles/common.css?inline'")
     expect(transformed).toContain('const __litSsgCommonStyles = [__litSsgCss`${__litSsgUnsafeCSS(__litSsgCommonCssText0)}`]')
     expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`p { color: red; }`]')
-    expect(transformed).toContain('static styles = css`p { color: orange; }`')
+    expect(transformed).toContain('static styles = css`p{color:orange}`')
     expect(transformed.match(/__litSsgCommonStyles/g)?.length).toBeGreaterThanOrEqual(2)
   })
 
@@ -153,7 +153,7 @@ export default defineLitRoute({
     const root = await createTempProject({
       'src/styles/common.css': ':host { border-top: 4px solid chartreuse; }',
       'src/pages/index.ts': `
-import { defineLitRoute } from 'vite-plugin-lit-ssg'
+import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
 import { ImportedPage } from '../shared/imported-page.js'
 
 export default defineLitRoute({
@@ -275,7 +275,7 @@ export default DemoWidget
     expect(transformed).toContain("import __litSsgCommonCssText1 from '/src/styles/second.css?inline'")
     expect(transformed).toContain('const __litSsgCommonStyles = [__litSsgCss`${__litSsgUnsafeCSS(__litSsgCommonCssText0)}`, __litSsgCss`${__litSsgUnsafeCSS(__litSsgCommonCssText1)}`]')
     expect(transformed.indexOf('__litSsgCommonCssText0')).toBeLessThan(transformed.indexOf('__litSsgCommonCssText1'))
-    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`p { color: blue; }`]')
+    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`p{color:#00f}`]')
   })
 
   it('rewrites only the configured single-component export', async () => {
@@ -304,8 +304,8 @@ export { DemoWidget as NamedWidget }
     const result = await plugin.transform.call(createResolveContext(root), code, entryPath)
     const transformed = getTransformedCode(result)
 
-    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`p { color: blue; }`]')
-    expect(transformed).toContain('static styles = css`p { color: orange; }`')
+    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`p{color:#00f}`]')
+    expect(transformed).toContain('static styles = css`p{color:orange}`')
   })
 
   it('fails on complex static get styles getters', async () => {
@@ -363,6 +363,6 @@ export default DemoWidget
     const result = await plugin.transform.call(createResolveContext(root), code, entryPath)
     const transformed = getTransformedCode(result)
 
-    expect(transformed).toContain('return [...__litSsgCommonStyles, css`p { color: rebeccapurple; }`]')
+    expect(transformed).toContain('return [...__litSsgCommonStyles, css`p{color:#639}`]')
   })
 })
