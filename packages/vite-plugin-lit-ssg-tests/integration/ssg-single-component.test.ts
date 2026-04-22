@@ -60,8 +60,8 @@ describe('single-component SSG integration', () => {
   it('index.html contains prepended common component styles before local styles', async () => {
     const content = await readFile(join(DIST_INHERIT, 'index.html'), 'utf-8')
     expect(content).toContain('chartreuse')
-    expect(content).toContain('color: blue;')
-    expect(content.indexOf('chartreuse')).toBeLessThan(content.indexOf('color: blue;'))
+    expect(content).toContain('p{color:#00f}')
+    expect(content.indexOf('chartreuse')).toBeLessThan(content.indexOf('p{color:#00f}'))
   })
 
   it('index.html has no html shell (no doctype, no <html>, no <body>)', async () => {

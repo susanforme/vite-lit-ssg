@@ -89,7 +89,8 @@ describe('SSG convention-based integration', () => {
 
   it('index.html keeps commonStyles ordering while compressing the rendered page markup', async () => {
     const content = await readFile(join(DIST_DIR, 'index.html'), 'utf-8')
-    expect(content).toContain('<style>:host{border-top:4px solid chartreuse}:host{display:block;font-family:sans-serif;max-width:800px;margin:0 auto;padding:2rem}h1{color:#333}nav a{margin-right:1rem;color:#06c;text-decoration:none}nav a:hover{text-decoration:underline}h1:hover{color:red}</style><nav><a href="/">Home</a><a href="/about">About</a></nav><h1>Welcome to vite-plugin-lit-ssg</h1><p>This page was statically generated using Lit SSR and Vite.</p><p>It supports LitElement with Shadow DOM, server-side rendering, and client-side hydration.</p><button>Click me</button>')
+    expect(content).toContain('<style>:host{border-top:4px solid chartreuse}:host :where(*){margin:0;padding:0;box-sizing:border-box}:host{max-width:800px;margin:0 auto;padding:2rem;font-family:sans-serif;display:block}h1{color:#333}nav a{color:#06c;margin-right:1rem;text-decoration:none}nav a:hover{text-decoration:underline}h1:hover{color:red}</style>')
+    expect(content).toMatch(/<!--lit-part [^>]+--><nav><a href="\/">Home<\/a> <a href="\/about">About<\/a><\/nav><h1>Welcome to vite-plugin-lit-ssg<\/h1><p>This page was statically generated using Lit SSR and Vite\.<\/p><p>It supports LitElement with Shadow DOM, server-side rendering, and client-side hydration\.<\/p><!--lit-node \d+--><button ?[^>]*>Click me<\/button><!--\/lit-part-->/)
   })
 
   it('about page has correct content and title from defineLitRoute', async () => {
@@ -102,13 +103,14 @@ describe('SSG convention-based integration', () => {
   it('about page applies common styles through static get styles()', async () => {
     const content = await readFile(join(DIST_DIR, 'about', 'index.html'), 'utf-8')
     expect(content).toContain('chartreuse')
-    expect(content).toContain('rebeccapurple')
-    expect(content.indexOf('chartreuse')).toBeLessThan(content.indexOf('rebeccapurple'))
+    expect(content).toContain('#639')
+    expect(content.indexOf('chartreuse')).toBeLessThan(content.indexOf('#639'))
   })
 
   it('about page still compresses static render markup after commonStyles rewrites', async () => {
     const content = await readFile(join(DIST_DIR, 'about', 'index.html'), 'utf-8')
-    expect(content).toContain('<nav><a href="/">Home</a><a href="/about">About</a></nav><h1>About</h1><p>vite-plugin-lit-ssg is a Vite plugin for generating static sites with Lit.</p><ul><li>Build-time prerendering with Lit SSR</li><li>Automatic JS/CSS asset injection</li><li>Support for page-level title and meta tags</li><li>Deploy anywhere as static files</li></ul>')
+    expect(content).toContain('<style>:host{border-top:4px solid chartreuse}:host :where(*){margin:0;padding:0;box-sizing:border-box}:host{max-width:800px;margin:0 auto;padding:2rem;font-family:sans-serif;display:block}h1{color:#333}nav a{color:#06c;margin-right:1rem;text-decoration:none}nav a:hover{text-decoration:underline}ul{border-left:3px solid #639;line-height:1.8}</style>')
+    expect(content).toMatch(/<!--lit-part [^>]+--><nav><a href="\/">Home<\/a> <a href="\/about">About<\/a><\/nav><h1>About<\/h1><p>vite-plugin-lit-ssg is a Vite plugin for generating static sites with Lit\.<\/p><ul><li>Build-time prerendering with Lit SSR<\/li><li>Automatic JS\/CSS asset injection<\/li><li>Support for page-level title and meta tags<\/li><li>Deploy anywhere as static files<\/li><\/ul><!--\/lit-part-->/)
   })
 
   it('about page injects meta description from defineLitRoute', async () => {

@@ -40,6 +40,26 @@ describe('resolveAssetsFromManifest', () => {
     ).toThrow(/No manifest entry found for key/)
   })
 
+  it('falls back to a prefixed emitted virtual page key when the exact key is absent', () => {
+    const prefixedManifest: ViteManifest = {
+      '../../packages/vite-plugin-lit-ssg-tests/virtual:lit-ssg-page/about': {
+        file: 'assets/about.js',
+        isEntry: true,
+        css: ['assets/about.css'],
+        imports: ['_shared-about.js'],
+      },
+      '_shared-about.js': {
+        file: 'assets/shared-about.js',
+      },
+    }
+
+    const assets = resolveAssetsFromManifest(prefixedManifest, './', 1, 'virtual:lit-ssg-page/about')
+
+    expect(assets.js).toBe('../assets/about.js')
+    expect(assets.css).toEqual(['../assets/about.css'])
+    expect(assets.modulepreloads).toEqual(['../assets/shared-about.js'])
+  })
+
   it('returns empty css and preloads when none in manifest', () => {
     const minimal: ViteManifest = {
       'lit-ssg-page-index': {

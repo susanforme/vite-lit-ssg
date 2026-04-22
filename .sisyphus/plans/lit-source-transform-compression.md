@@ -463,7 +463,7 @@ Wave 2: T6 dynamic HTML render compression, T7 page-mode integration, T8 single-
 
   **Commit**: NO | Message: `fix(plugin): harden lit compression skip paths` | Files: `packages/vite-plugin-lit-ssg/src/plugin/lit-source-compression.ts`, `packages/vite-plugin-lit-ssg-tests/unit/plugin-lit-source-compression.test.ts`
 
-- [ ] 10. Finalize sourcemap and full-repo regression coverage
+- [x] 10. Finalize sourcemap and full-repo regression coverage
 
   **What to do**: Ensure the compression pass produces stable file-level MagicString maps after `commonStyles` rewrites and before Vite consumes the transformed module. Add targeted assertions that transformed modules remain decorator-free where expected, source transforms do not duplicate helper imports, and the repo still passes typecheck/build/test/playground build. If any fixture output changes only because of canonical minified whitespace, update the assertion strings to the new documented canonical output rather than loosening them.
   **Must NOT do**: Do not weaken assertions to broad substring checks where exact transformed output should be asserted, and do not ship with unverified sourcemap behavior.
@@ -509,10 +509,10 @@ Wave 2: T6 dynamic HTML render compression, T7 page-mode integration, T8 single-
 > 4 review agents run in PARALLEL. ALL must APPROVE. Present consolidated results to user and get explicit "okay" before completing.
 > **Do NOT auto-proceed after verification. Wait for user's explicit approval before marking work complete.**
 > **Never mark F1-F4 as checked before getting user's okay.** Rejection or user feedback -> fix -> re-run -> present again -> wait for okay.
-- [ ] F1. Plan Compliance Audit — oracle
-- [ ] F2. Code Quality Review — unspecified-high
-- [ ] F3. Real Manual QA — unspecified-high (+ playwright if UI)
-- [ ] F4. Scope Fidelity Check — deep
+- [x] F1. Plan Compliance Audit — oracle
+- [x] F2. Code Quality Review — unspecified-high
+- [x] F3. Real Manual QA — unspecified-high (+ playwright if UI)
+- [x] F4. Scope Fidelity Check — deep
 
 ## Commit Strategy
 - Single atomic commit after T1-T10 and F1-F4 all pass and the user explicitly approves completion.

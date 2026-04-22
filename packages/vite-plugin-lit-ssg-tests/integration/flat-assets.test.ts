@@ -3,7 +3,7 @@ import { execSync } from 'node:child_process'
 import { readdirSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
-const PLAYGROUND_ROOT = resolve(import.meta.dirname, '../../playground')
+const PLAYGROUND_ROOT = resolve(import.meta.dirname, '../../../playground/page-mode')
 const DIST_ROOT = join(PLAYGROUND_ROOT, 'temp', 'dist-flat-assets-test')
 const DIST_ASSETS = join(DIST_ROOT, 'assets')
 

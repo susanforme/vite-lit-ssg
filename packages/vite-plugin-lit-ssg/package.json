@@ -1,6 +1,6 @@
 {
   "name": "vite-plugin-lit-ssg",
-  "version": "0.1.0",
+  "version": "0.0.1-alpha.1",
   "description": "Vite plugin for Lit static site generation",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -20,7 +20,7 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "vite-lit-ssg": "./dist/cli.cjs"
+    "vite-lit-ssg": "dist/cli.cjs"
   },
   "files": [
     "dist"
@@ -34,9 +34,8 @@
   "dependencies": {
     "@lit-labs/ssr": "^4.0.0",
     "@lit-labs/ssr-client": "^1.1.7",
+    "@literals/html-css-minifier": "^4.0.1",
     "@webcomponents/template-shadowroot": "^0.2.1",
-    "htmlnano": "^2.1.5",
-    "lightningcss": "^1.30.2",
     "magic-string": "^0.30.17",
     "tinyglobby": "^0.2.16",
     "typescript": "^5.7.0"
@@ -62,5 +61,13 @@
     "static-site-generation",
     "web-components"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/susanforme/vite-lit-ssg.git",
+    "directory": "packages/vite-plugin-lit-ssg"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT"
 }

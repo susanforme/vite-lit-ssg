@@ -30,10 +30,6 @@ import {
   classifyLitSourceCompressionTargets,
   createLitSourceCompressionSourceFile,
   minifyLitSourceCompressionTarget,
-  rewriteLitSourceCompressionCssFields,
-  rewriteLitSourceCompressionCssGetters,
-  rewriteLitSourceCompressionDynamicHtmlRenders,
-  rewriteLitSourceCompressionStaticHtmlRenders,
 } from './lit-source-compression'
 
 function resolvePackageUrl(specifier: string): string {
@@ -810,49 +806,25 @@ async function rewriteModuleWithPageSourceCompression(
   code: string,
   cleanId: string,
   sourceFile: ts.SourceFile,
-): Promise<string | null> {
-  const replacementKinds = new Set(
-    classifyLitSourceCompressionTargets(sourceFile).replacementTargets.map((target) => target.kind),
-  )
+): Promise<{ code: string, map: ReturnType<MagicString['generateMap']> } | null> {
+  const compressionRewrites = await collectLitSourceCompressionRewrites(cleanId, sourceFile)
 
-  if (replacementKinds.size === 0) return null
+  if (compressionRewrites.length === 0) return null
 
-  let rewrittenCode = code
-  let hasChanges = false
+  const magicString = new MagicString(code, { filename: cleanId })
 
-  if (replacementKinds.has('css-field')) {
-    const result = await rewriteLitSourceCompressionCssFields(rewrittenCode, cleanId)
-    if (result) {
-      rewrittenCode = result.code
-      hasChanges = true
-    }
+  for (const rewrite of [...compressionRewrites].reverse()) {
+    magicString.overwrite(rewrite.start, rewrite.end, rewrite.replacementText)
   }
 
-  if (replacementKinds.has('css-getter')) {
-    const result = await rewriteLitSourceCompressionCssGetters(rewrittenCode, cleanId)
-    if (result) {
-      rewrittenCode = result.code
-      hasChanges = true
-    }
+  return {
+    code: magicString.toString(),
+    map: magicString.generateMap({
+      source: cleanId,
+      includeContent: true,
+      hires: true,
+    }),
   }
-
-  if (replacementKinds.has('html-render-static')) {
-    const result = await rewriteLitSourceCompressionStaticHtmlRenders(rewrittenCode, cleanId)
-    if (result) {
-      rewrittenCode = result.code
-      hasChanges = true
-    }
-  }
-
-  if (replacementKinds.has('html-render-dynamic')) {
-    const result = await rewriteLitSourceCompressionDynamicHtmlRenders(rewrittenCode, cleanId)
-    if (result) {
-      rewrittenCode = result.code
-      hasChanges = true
-    }
-  }
-
-  return hasChanges ? rewrittenCode : null
 }
 
 async function queueExternalTarget(
@@ -1321,7 +1293,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         const sourceFile = createSourceFile(cleanId, transformedCode)
         const localTargets = new Set<string>()
 
-        if (state.kind === 'single-component') {
+        if (shouldApplySourceCompression) {
           compressionRewrites = await collectLitSourceCompressionRewrites(cleanId, sourceFile)
         }
 
@@ -1363,18 +1335,13 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       }
 
       const compressionSourceFile = createLitSourceCompressionSourceFile(cleanId, transformedCode)
-      const compressedCode = await rewriteModuleWithPageSourceCompression(
+      const compressionResult = await rewriteModuleWithPageSourceCompression(
         transformedCode,
         cleanId,
         compressionSourceFile,
       )
 
-      if (compressedCode) {
-        return {
-          code: compressedCode,
-          map: null,
-        }
-      }
+      if (compressionResult) return compressionResult
 
       return commonStylesResult
     },

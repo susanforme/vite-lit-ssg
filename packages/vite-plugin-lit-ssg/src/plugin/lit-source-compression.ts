@@ -1,5 +1,4 @@
-import htmlnano, { type HtmlnanoOptions } from 'htmlnano'
-import { transform } from 'lightningcss'
+import { minifyHTMLLiterals } from '@literals/html-css-minifier'
 import MagicString from 'magic-string'
 import * as ts from 'typescript'
 
@@ -154,18 +153,16 @@ export interface LitSourceCompressionRewriteResult {
   map: ReturnType<MagicString['generateMap']>
 }
 
-export const LIT_SOURCE_COMPRESSION_HTMLNANO_OPTIONS = {
-  collapseWhitespace: 'aggressive',
-  minifyCss: false,
-  minifyJs: false,
-  minifySvg: false,
-  removeComments: 'safe',
-} as const satisfies HtmlnanoOptions
+export const LIT_SOURCE_COMPRESSION_MINIFIER_OPTIONS = {
+  generateSourceMap: false,
+} as const
 
 const RAW_TEXT_SKIP_TAG_PATTERN = new RegExp(
   `<\\s*(${LIT_SOURCE_COMPRESSION_RAW_TEXT_SKIP_TAGS.join('|')})(?=[\\s>/])`,
   'i',
 )
+const SYNTHETIC_TEMPLATE_START = '/*__litSsgCompressionStart__*/'
+const SYNTHETIC_TEMPLATE_END = '/*__litSsgCompressionEnd__*/'
 const HTML_COMMENT_START_PATTERN = /<!--/
 const HTML_COMMENT_END_PATTERN = /-->/
 const DYNAMIC_HTML_TAG_EXPRESSION_PATTERN = /<\/?\s*\$\{/
@@ -728,24 +725,30 @@ function restoreProtectedDynamicHtmlTemplate(
   return restoredText
 }
 
-function minifyCssTemplateText(text: string, fileName: string): string {
-  const result = transform({
-    filename: fileName,
-    code: Buffer.from(text),
-    minify: true,
-  })
-
-  return Buffer.from(result.code).toString('utf8')
+function buildSyntheticSource(policy: LitSourceCompressionPolicy, text: string): string {
+  return `${policy.syntheticPrefix}${SYNTHETIC_TEMPLATE_START}${policy.expectedTagName}\`${text}\`${SYNTHETIC_TEMPLATE_END}${policy.syntheticSuffix}`
 }
 
-async function minifyHtmlTemplateText(text: string): Promise<string> {
-  const result = await htmlnano.process(
-    text,
-    LIT_SOURCE_COMPRESSION_HTMLNANO_OPTIONS,
-    htmlnano.presets.safe,
-  )
+function extractTemplateText(code: string, expectedTagName: 'css' | 'html'): string {
+  const markerStart = code.indexOf(SYNTHETIC_TEMPLATE_START)
+  const markerEnd = code.indexOf(SYNTHETIC_TEMPLATE_END)
 
-  return result.html
+  if (markerStart < 0 || markerEnd < 0 || markerEnd <= markerStart) {
+    throw new Error('[vite-plugin-lit-ssg] Lit source compression could not recover the synthetic template markers.')
+  }
+
+  const expression = code
+    .slice(markerStart + SYNTHETIC_TEMPLATE_START.length, markerEnd)
+    .trim()
+  const templatePrefix = `${expectedTagName}\``
+
+  if (!expression.startsWith(templatePrefix) || !expression.endsWith('`')) {
+    throw new Error(
+      `[vite-plugin-lit-ssg] Lit source compression could not recover the minified ${expectedTagName} template.`,
+    )
+  }
+
+  return expression.slice(templatePrefix.length, -1)
 }
 
 export async function minifyLitSourceCompressionTarget(
@@ -789,9 +792,19 @@ export async function minifyLitSourceCompressionTarget(
       restoreDynamicTemplateText = (text) => restoreProtectedDynamicHtmlTemplate(text, protectedTemplate.placeholders)
     }
 
-    const minifiedText = policy.expectedTagName === 'css'
-      ? minifyCssTemplateText(textToMinify, request.fileName)
-      : await minifyHtmlTemplateText(textToMinify)
+    const result = await minifyHTMLLiterals(
+      buildSyntheticSource(policy, textToMinify),
+      {
+        fileName: request.fileName,
+        ...LIT_SOURCE_COMPRESSION_MINIFIER_OPTIONS,
+      },
+    )
+
+    if (!result) {
+      return { changed: false, reason: 'minifier-no-change' }
+    }
+
+    const minifiedText = extractTemplateText(result.code, policy.expectedTagName)
     const text = restoreDynamicTemplateText ? restoreDynamicTemplateText(minifiedText) : minifiedText
 
     if (text == null) {

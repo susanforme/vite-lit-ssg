@@ -14,7 +14,8 @@ export function resolveAssetsFromManifest(
   routeDepth: number = 0,
   pageEntryKey: string,
 ): AssetLinks {
-  const entry = manifest[pageEntryKey]
+  const resolvedEntryKey = resolveManifestEntryKey(manifest, pageEntryKey)
+  const entry = manifest[resolvedEntryKey]
 
   if (!entry) {
     throw new Error(
@@ -25,10 +26,16 @@ export function resolveAssetsFromManifest(
   const isRelativeBase = isRelative(base)
 
   const js = formatHref(base, entry.file, isRelativeBase, routeDepth)
-  const css = collectCss(manifest, pageEntryKey, base, isRelativeBase, routeDepth)
+  const css = collectCss(manifest, resolvedEntryKey, base, isRelativeBase, routeDepth)
   const modulepreloads = collectModulePreloads(manifest, entry.imports ?? [], base, isRelativeBase, routeDepth)
 
   return { js, css, modulepreloads }
+}
+
+function resolveManifestEntryKey(manifest: ViteManifest, pageEntryKey: string): string {
+  if (manifest[pageEntryKey]) return pageEntryKey
+
+  return Object.keys(manifest).find((key) => key.endsWith(pageEntryKey)) ?? pageEntryKey
 }
 
 function collectCss(
