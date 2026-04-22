@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
-  LIT_SOURCE_COMPRESSION_HTMLNANO_OPTIONS,
+  LIT_SOURCE_COMPRESSION_MINIFIER_OPTIONS,
   LIT_SOURCE_COMPRESSION_RAW_TEXT_SKIP_TAGS,
   LIT_SOURCE_COMPRESSION_SKIP_MATRIX,
   LIT_SOURCE_COMPRESSION_SUPPORT_MATRIX,
@@ -20,12 +20,8 @@ function getRangeText(source: string, start: number, end: number): string {
 
 describe('lit source compression policy module', () => {
   it('defines the v1 support and skip matrices for every target kind', () => {
-    expect(LIT_SOURCE_COMPRESSION_HTMLNANO_OPTIONS).toEqual({
-      collapseWhitespace: 'aggressive',
-      minifyCss: false,
-      minifyJs: false,
-      minifySvg: false,
-      removeComments: 'safe',
+    expect(LIT_SOURCE_COMPRESSION_MINIFIER_OPTIONS).toEqual({
+      generateSourceMap: false,
     })
 
     expect(LIT_SOURCE_COMPRESSION_RAW_TEXT_SKIP_TAGS).toEqual([

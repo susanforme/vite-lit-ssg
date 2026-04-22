@@ -17,6 +17,13 @@ interface TestPlugin {
   transform?: (this: TestResolveContext, code: string, id: string) => unknown | Promise<unknown>
 }
 
+interface TestTransformResult {
+  code: string
+  map?: {
+    toString(): string
+  } | null
+}
+
 function getTransformedCode(result: unknown): string {
   if (typeof result === 'string') return result
   if (result && typeof result === 'object' && 'code' in result) {
@@ -24,6 +31,20 @@ function getTransformedCode(result: unknown): string {
     if (typeof code === 'string') return code
   }
   return ''
+}
+
+function getTransformResult(result: unknown): TestTransformResult | null {
+  if (!result || typeof result !== 'object' || !('code' in result)) return null
+
+  const { code, map } = result as { code?: unknown, map?: unknown }
+  if (typeof code !== 'string') return null
+
+  return {
+    code,
+    map: map && typeof map === 'object' && 'toString' in map && typeof map.toString === 'function'
+      ? map as TestTransformResult['map']
+      : null,
+  }
 }
 
 async function writeFixtureFiles(root: string, files: Record<string, string>) {
@@ -144,7 +165,7 @@ export default defineLitRoute({
     const transformed = getTransformedCode(result)
     expect(transformed).toContain("import __litSsgCommonCssText0 from '/src/styles/common.css?inline'")
     expect(transformed).toContain('const __litSsgCommonStyles = [__litSsgCss`${__litSsgUnsafeCSS(__litSsgCommonCssText0)}`]')
-    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`p { color: red; }`]')
+    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`p{color:red}`]')
     expect(transformed).toContain('static styles = css`p{color:orange}`')
     expect(transformed.match(/__litSsgCommonStyles/g)?.length).toBeGreaterThanOrEqual(2)
   })
@@ -216,6 +237,42 @@ export default DemoWidget
     const transformed = getTransformedCode(result)
 
     expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`:host { color: blue; }`, css`p { color: red; }`]')
+  })
+
+  it('returns a real sourcemap when compression rewrites run without duplicating helper imports', async () => {
+    const root = await createTempProject({
+      'src/styles/common.css': ':host { border-top: 4px solid chartreuse; }',
+      'src/demo-widget.ts': `
+import { LitElement, css } from 'lit'
+
+export class DemoWidget extends LitElement {
+  static styles = css\`p { color: blue; }\`
+}
+
+export default DemoWidget
+`,
+    })
+    roots.push(root)
+
+    const plugin = await initSinglePlugin(root)
+    const entryPath = join(root, 'src/demo-widget.ts')
+    const code = await readFile(entryPath, 'utf-8')
+    if (!plugin.transform) throw new Error('Expected transform hook to be defined.')
+    const result = await plugin.transform.call(createResolveContext(root), code, entryPath)
+    const transformResult = getTransformResult(result)
+
+    expect(transformResult).not.toBeNull()
+    expect(transformResult?.map).not.toBeNull()
+
+    const transformed = transformResult?.code ?? ''
+    expect(transformed).toContain("import __litSsgCommonCssText0 from '/src/styles/common.css?inline'")
+    expect(transformed.match(/import __litSsgCommonCssText0 from '\/src\/styles\/common\.css\?inline'/g)?.length).toBe(1)
+    expect(transformed.match(/const __litSsgCommonStyles = \[/g)?.length).toBe(1)
+    expect(transformed).toContain('static styles = [...__litSsgCommonStyles, css`p{color:#00f}`]')
+
+    const mapJson = transformResult?.map?.toString() ?? ''
+    expect(mapJson).toContain(entryPath)
+    expect(mapJson).toContain('"mappings":')
   })
 
   it('prepends common styles ahead of generic static styles expressions', async () => {
