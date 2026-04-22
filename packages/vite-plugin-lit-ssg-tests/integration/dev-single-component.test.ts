@@ -51,12 +51,15 @@ describe('single-component dev mode — HTML shell (base=/)', () => {
     expect(html).toContain('type="module"')
   })
 
-  it('serves transformed entry module without raw decorator syntax', async () => {
+  it('serves transformed entry module with minified supported templates and preserved commonStyles markers', async () => {
     const res = await fetch(`http://localhost:${port}/src/demo-widget.ts`)
     expect(res.status).toBe(200)
     const moduleCode = await res.text()
     expect(moduleCode).not.toContain('@customElement(')
     expect(moduleCode).toContain('demo-widget')
+    expect(moduleCode).toMatch(/__litSsgCommonStyles,\s*css`:host\{(?:display:block;font-family:sans-serif|font-family:sans-serif;display:block)\}p\{(?:color:blue|color:#00f)\}`/)
+    expect(moduleCode).not.toContain('font-family: sans-serif;')
+    expect(moduleCode).not.toContain('p { color: blue; }')
     expect(moduleCode).toContain('?inline')
     expect(moduleCode).toContain('__litSsgCommonStyles')
     expect(moduleCode).toContain('unsafeCSS')

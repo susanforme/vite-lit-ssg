@@ -25,6 +25,15 @@ import {
   VIRTUAL_SINGLE_DEV_ID,
   VIRTUAL_SINGLE_SERVER_ID,
 } from './constants'
+import {
+  classifyLitSourceCompressionTargets,
+  createLitSourceCompressionSourceFile,
+  minifyLitSourceCompressionTarget,
+  rewriteLitSourceCompressionCssFields,
+  rewriteLitSourceCompressionCssGetters,
+  rewriteLitSourceCompressionDynamicHtmlRenders,
+  rewriteLitSourceCompressionStaticHtmlRenders,
+} from './lit-source-compression'
 
 function resolvePackageUrl(specifier: string): string {
   return pathToFileURL(resolvePackageFilePath(specifier)).href
@@ -543,6 +552,64 @@ function prependCommonStyles(expression: ts.Expression, sourceFile: ts.SourceFil
   return `[...${COMMON_STYLES_IDENTIFIER}, ${expression.getText(sourceFile)}]`
 }
 
+interface LitSourceCompressionRewrite {
+  key: string
+  replacementText: string
+  start: number
+  end: number
+}
+
+function getLitSourceCompressionRewriteKey(start: number, end: number): string {
+  return `${start}:${end}`
+}
+
+function getExpressionRewriteKey(expression: ts.Expression, sourceFile: ts.SourceFile): string {
+  return getLitSourceCompressionRewriteKey(expression.getStart(sourceFile), expression.getEnd())
+}
+
+async function collectLitSourceCompressionRewrites(
+  fileName: string,
+  sourceFile: ts.SourceFile,
+): Promise<LitSourceCompressionRewrite[]> {
+  const { replacementTargets } = classifyLitSourceCompressionTargets(sourceFile)
+  const rewrites: LitSourceCompressionRewrite[] = []
+
+  for (const target of replacementTargets) {
+    const result = await minifyLitSourceCompressionTarget({
+      fileName,
+      kind: target.kind,
+      tagName: target.tagName,
+      text: target.text,
+    })
+
+    if (!result.changed) continue
+
+    rewrites.push({
+      key: getLitSourceCompressionRewriteKey(target.expressionRange.start, target.expressionRange.end),
+      replacementText: `${target.tagName}\`${result.text}\``,
+      start: target.expressionRange.start,
+      end: target.expressionRange.end,
+    })
+  }
+
+  return rewrites
+}
+
+function prependCommonStylesWithOptionalRewrite(
+  expression: ts.Expression,
+  sourceFile: ts.SourceFile,
+  replacementText?: string,
+): string {
+  if (ts.isArrayLiteralExpression(expression)) {
+    const elements = expression.elements.map((element) => element.getText(sourceFile))
+    return elements.length === 0
+      ? `[...${COMMON_STYLES_IDENTIFIER}]`
+      : `[...${COMMON_STYLES_IDENTIFIER}, ${elements.join(', ')}]`
+  }
+
+  return `[...${COMMON_STYLES_IDENTIFIER}, ${replacementText ?? expression.getText(sourceFile)}]`
+}
+
 function getLineIndentation(source: string, position: number): string {
   let lineStart = source.lastIndexOf('\n', position)
   lineStart = lineStart === -1 ? 0 : lineStart + 1
@@ -582,6 +649,8 @@ function rewriteTargetClass(
   source: string,
   sourceFile: ts.SourceFile,
   classDecl: ts.ClassDeclaration,
+  compressionRewrites: Map<string, string>,
+  consumedCompressionRewriteKeys: Set<string>,
 ): void {
   const stylesMember = classDecl.members.find(isStaticStylesMember)
 
@@ -595,10 +664,14 @@ function rewriteTargetClass(
       throw new Error('[vite-plugin-lit-ssg] commonStyles found a static styles field without an initializer, which is not supported.')
     }
 
+    const rewriteKey = getExpressionRewriteKey(stylesMember.initializer, sourceFile)
+    const replacementText = compressionRewrites.get(rewriteKey)
+    if (replacementText) consumedCompressionRewriteKeys.add(rewriteKey)
+
     magicString.overwrite(
       stylesMember.initializer.getStart(sourceFile),
       stylesMember.initializer.getEnd(),
-      prependCommonStyles(stylesMember.initializer, sourceFile),
+      prependCommonStylesWithOptionalRewrite(stylesMember.initializer, sourceFile, replacementText),
     )
     return
   }
@@ -609,10 +682,14 @@ function rewriteTargetClass(
     throw new Error('[vite-plugin-lit-ssg] commonStyles only supports static get styles() getters with a single return statement.')
   }
 
+  const rewriteKey = getExpressionRewriteKey(statement.expression, sourceFile)
+  const replacementText = compressionRewrites.get(rewriteKey)
+  if (replacementText) consumedCompressionRewriteKeys.add(rewriteKey)
+
   magicString.overwrite(
     statement.expression.getStart(sourceFile),
     statement.expression.getEnd(),
-    prependCommonStyles(statement.expression, sourceFile),
+    prependCommonStylesWithOptionalRewrite(statement.expression, sourceFile, replacementText),
   )
 }
 
@@ -644,12 +721,15 @@ function rewriteModuleWithCommonStyles(
   cleanId: string,
   commonStylesImports: string[],
   targetClassNames: Set<string>,
+  compressionRewrites: LitSourceCompressionRewrite[] = [],
 ): { code: string, map: ReturnType<MagicString['generateMap']> } | null {
-  if (targetClassNames.size === 0) return null
+  if (targetClassNames.size === 0 && compressionRewrites.length === 0) return null
 
   const classes = collectClassDeclarations(sourceFile)
   const litElementNames = collectLitElementImportNames(sourceFile)
   const magicString = new MagicString(code, { filename: cleanId })
+  const compressionRewriteMap = new Map(compressionRewrites.map((rewrite) => [rewrite.key, rewrite.replacementText]))
+  const consumedCompressionRewriteKeys = new Set<string>()
 
   for (const className of targetClassNames) {
     const classDecl = classes.get(className)
@@ -663,19 +743,85 @@ function rewriteModuleWithCommonStyles(
       )
     }
 
-    rewriteTargetClass(magicString, code, sourceFile, classDecl)
+    rewriteTargetClass(
+      magicString,
+      code,
+      sourceFile,
+      classDecl,
+      compressionRewriteMap,
+      consumedCompressionRewriteKeys,
+    )
   }
 
-  insertCommonStylesHelper(magicString, sourceFile, commonStylesImports)
+  for (const rewrite of [...compressionRewrites].reverse()) {
+    if (consumedCompressionRewriteKeys.has(rewrite.key)) continue
+    magicString.overwrite(rewrite.start, rewrite.end, rewrite.replacementText)
+  }
+
+  if (targetClassNames.size > 0) {
+    insertCommonStylesHelper(magicString, sourceFile, commonStylesImports)
+  }
+
+  const rewrittenCode = magicString.toString()
+  if (rewrittenCode === code) return null
 
   return {
-    code: magicString.toString(),
+    code: rewrittenCode,
     map: magicString.generateMap({
       source: cleanId,
       includeContent: true,
       hires: true,
     }),
   }
+}
+
+async function rewriteModuleWithPageSourceCompression(
+  code: string,
+  cleanId: string,
+  sourceFile: ts.SourceFile,
+): Promise<string | null> {
+  const replacementKinds = new Set(
+    classifyLitSourceCompressionTargets(sourceFile).replacementTargets.map((target) => target.kind),
+  )
+
+  if (replacementKinds.size === 0) return null
+
+  let rewrittenCode = code
+  let hasChanges = false
+
+  if (replacementKinds.has('css-field')) {
+    const result = await rewriteLitSourceCompressionCssFields(rewrittenCode, cleanId)
+    if (result) {
+      rewrittenCode = result.code
+      hasChanges = true
+    }
+  }
+
+  if (replacementKinds.has('css-getter')) {
+    const result = await rewriteLitSourceCompressionCssGetters(rewrittenCode, cleanId)
+    if (result) {
+      rewrittenCode = result.code
+      hasChanges = true
+    }
+  }
+
+  if (replacementKinds.has('html-render-static')) {
+    const result = await rewriteLitSourceCompressionStaticHtmlRenders(rewrittenCode, cleanId)
+    if (result) {
+      rewrittenCode = result.code
+      hasChanges = true
+    }
+  }
+
+  if (replacementKinds.has('html-render-dynamic')) {
+    const result = await rewriteLitSourceCompressionDynamicHtmlRenders(rewrittenCode, cleanId)
+    if (result) {
+      rewrittenCode = result.code
+      hasChanges = true
+    }
+  }
+
+  return hasChanges ? rewrittenCode : null
 }
 
 async function queueExternalTarget(
@@ -1115,51 +1261,91 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
     async transform(code, id) {
       const cleanId = normalizeFileId(id)
-      const root = state.resolvedConfig?.root ?? process.cwd()
-      const commonStyleImports = resolveCommonStylesImports(root, state.commonStyles)
-
-      if (commonStyleImports.length === 0) return null
       if (!shouldHandleModule(cleanId)) return null
       if (id.includes('?inline')) return null
-      if (code.includes(`const ${COMMON_STYLES_IDENTIFIER} =`)) return null
+
+      const root = state.resolvedConfig?.root ?? process.cwd()
+      const commonStyleImports = resolveCommonStylesImports(root, state.commonStyles)
 
       const queuedTargets = state.transformTargets.get(cleanId) ?? []
       const isPageModule = state.kind === 'page' && state.pageModuleIds.has(cleanId)
       const isSingleEntry = state.kind === 'single-component' && state.entryModuleId === cleanId
 
-      if (!isPageModule && !isSingleEntry && queuedTargets.length === 0) {
+      const shouldApplyCommonStyles = commonStyleImports.length > 0
+        && !code.includes(`const ${COMMON_STYLES_IDENTIFIER} =`)
+        && (isPageModule || isSingleEntry || queuedTargets.length > 0)
+      const shouldApplySourceCompression = state.kind === 'page'
+        || isSingleEntry
+        || queuedTargets.length > 0
+
+      if (!shouldApplyCommonStyles && !shouldApplySourceCompression) {
         return null
       }
 
-      const sourceFile = createSourceFile(cleanId, code)
-      const localTargets = new Set<string>()
+      let transformedCode = code
+      let commonStylesResult: ReturnType<typeof rewriteModuleWithCommonStyles> | null = null
+      let compressionRewrites: LitSourceCompressionRewrite[] = []
 
-      if (isPageModule) {
-        const resolution = resolvePageComponentTarget(sourceFile)
-        await applyTargetResolution(this, state.transformTargets, cleanId, localTargets, resolution)
-      }
+      if (shouldApplyCommonStyles) {
+        const sourceFile = createSourceFile(cleanId, transformedCode)
+        const localTargets = new Set<string>()
 
-      if (isSingleEntry && state.kind === 'single-component') {
-        const resolution = resolveExportTarget(sourceFile, state.resolved.exportName)
-        if (!resolution) {
-          throw new Error(
-            `[vite-plugin-lit-ssg] commonStyles could not find export "${state.resolved.exportName}" in ${cleanId}.`,
-          )
+        if (state.kind === 'single-component') {
+          compressionRewrites = await collectLitSourceCompressionRewrites(cleanId, sourceFile)
         }
-        await applyTargetResolution(this, state.transformTargets, cleanId, localTargets, resolution)
+
+        if (isPageModule) {
+          const resolution = resolvePageComponentTarget(sourceFile)
+          await applyTargetResolution(this, state.transformTargets, cleanId, localTargets, resolution)
+        }
+
+        if (isSingleEntry && state.kind === 'single-component') {
+          const resolution = resolveExportTarget(sourceFile, state.resolved.exportName)
+          if (!resolution) {
+            throw new Error(
+              `[vite-plugin-lit-ssg] commonStyles could not find export "${state.resolved.exportName}" in ${cleanId}.`,
+            )
+          }
+          await applyTargetResolution(this, state.transformTargets, cleanId, localTargets, resolution)
+        }
+
+        if (queuedTargets.length > 0) {
+          await resolveQueuedTargets(this, state.transformTargets, sourceFile, cleanId, queuedTargets, localTargets)
+        }
+
+        commonStylesResult = rewriteModuleWithCommonStyles(
+          transformedCode,
+          sourceFile,
+          cleanId,
+          commonStyleImports,
+          localTargets,
+          compressionRewrites,
+        )
+
+        if (commonStylesResult) {
+          transformedCode = commonStylesResult.code
+        }
       }
 
-      if (queuedTargets.length > 0) {
-        await resolveQueuedTargets(this, state.transformTargets, sourceFile, cleanId, queuedTargets, localTargets)
+      if (!shouldApplySourceCompression) {
+        return commonStylesResult
       }
 
-      return rewriteModuleWithCommonStyles(
-        code,
-        sourceFile,
+      const compressionSourceFile = createLitSourceCompressionSourceFile(cleanId, transformedCode)
+      const compressedCode = await rewriteModuleWithPageSourceCompression(
+        transformedCode,
         cleanId,
-        commonStyleImports,
-        localTargets,
+        compressionSourceFile,
       )
+
+      if (compressedCode) {
+        return {
+          code: compressedCode,
+          map: null,
+        }
+      }
+
+      return commonStylesResult
     },
 
     resolveId(id, importer) {

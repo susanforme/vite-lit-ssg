@@ -1,23 +1,87 @@
 {
-  "active_plan": "/Users/sz-20250303-003/code/vite-lit-ssg/.sisyphus/plans/per-page-code-split.md",
-  "started_at": "2026-04-16T02:30:51.675Z",
+  "active_plan": "/Users/sz-20250303-003/code/vite-lit-ssg/.sisyphus/plans/lit-source-transform-compression.md",
+  "started_at": "2026-04-22T02:34:56.619Z",
   "session_ids": [
-    "ses_26bf7fabcffe0tB8oo88csjJEK"
+    "ses_24d0fc4aaffeNMh7ov3ySqjW8h",
+    "ses_24cf25a49ffeQYv4I06oAY1vdx",
+    "ses_24cf25a46ffe4WKEWvcm2DmKRH",
+    "ses_24cf25a3dffemBC8xU8YyLfvgV",
+    "ses_24c69871affeLVeKCsyvTUaisy",
+    "ses_24c6986a7ffe8vG5lcAC9aAwV0"
   ],
-  "plan_name": "per-page-code-split",
+  "plan_name": "lit-source-transform-compression",
   "agent": "atlas",
   "session_origins": {
-    "ses_26bf7fabcffe0tB8oo88csjJEK": "direct"
+    "ses_24d0fc4aaffeNMh7ov3ySqjW8h": "direct",
+    "ses_24cf25a49ffeQYv4I06oAY1vdx": "appended",
+    "ses_24cf25a46ffe4WKEWvcm2DmKRH": "appended",
+    "ses_24cf25a3dffemBC8xU8YyLfvgV": "appended",
+    "ses_24c69871affeLVeKCsyvTUaisy": "appended",
+    "ses_24c6986a7ffe8vG5lcAC9aAwV0": "appended"
   },
   "task_sessions": {
     "todo:1": {
       "task_key": "todo:1",
       "task_label": "1",
-      "task_title": "改造 `virtual/client-entry.ts` - 拆分为 shared + per-page entry 生成函数",
-      "session_id": "ses_26bde8726ffeQpVF5CzHo3zjgR",
+      "task_title": "Lock compression engine and policy module",
+      "session_id": "ses_24ced4dd7ffepBX9e65orOZmx0",
       "agent": "Sisyphus-Junior",
-      "category": "quick",
-      "updated_at": "2026-04-16T03:01:55.464Z"
+      "category": "unspecified-high",
+      "updated_at": "2026-04-22T02:57:19.294Z"
+    },
+    "todo:2": {
+      "task_key": "todo:2",
+      "task_label": "2",
+      "task_title": "Implement import-aware AST target classifier",
+      "session_id": "ses_24cd6037effeFLJBqmHbzkuCIB",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-22T03:23:39.604Z"
+    },
+    "todo:3": {
+      "task_key": "todo:3",
+      "task_label": "3",
+      "task_title": "Add CSS field compression for `static styles = css```",
+      "session_id": "ses_24cbd69c7ffenqa99tUYeAR7d2",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-22T03:48:11.017Z"
+    },
+    "todo:6": {
+      "task_key": "todo:6",
+      "task_label": "6",
+      "task_title": "Add dynamic HTML render compression",
+      "session_id": "ses_24c9ebe99ffecE1FahwmPiVuCn",
+      "agent": "Sisyphus-Junior",
+      "category": "deep",
+      "updated_at": "2026-04-22T04:19:10.690Z"
+    },
+    "todo:7": {
+      "task_key": "todo:7",
+      "task_label": "7",
+      "task_title": "Integrate compression into the page-mode transform path",
+      "session_id": "ses_24c949db5ffeQCgCpHQU6MV14i",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-22T04:34:46.384Z"
+    },
+    "todo:8": {
+      "task_key": "todo:8",
+      "task_label": "8",
+      "task_title": "Integrate compression into the single-component transform path",
+      "session_id": "ses_24c867c19ffen8tSQOlffor5fg",
+      "agent": "Sisyphus-Junior",
+      "category": "unspecified-high",
+      "updated_at": "2026-04-22T04:46:46.708Z"
+    },
+    "todo:10": {
+      "task_key": "todo:10",
+      "task_label": "10",
+      "task_title": "Finalize sourcemap and full-repo regression coverage",
+      "session_id": "ses_24c69871affeLVeKCsyvTUaisy",
+      "agent": "explore",
+      "category": "",
+      "updated_at": "2026-04-22T05:11:10.629Z"
     }
   }
 }

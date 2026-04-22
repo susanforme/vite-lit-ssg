@@ -34,10 +34,11 @@
   "dependencies": {
     "@lit-labs/ssr": "^4.0.0",
     "@lit-labs/ssr-client": "^1.1.7",
+    "@literals/html-css-minifier": "^4.0.1",
     "@webcomponents/template-shadowroot": "^0.2.1",
     "magic-string": "^0.30.17",
-    "typescript": "^5.7.0",
-    "tinyglobby": "^0.2.16"
+    "tinyglobby": "^0.2.16",
+    "typescript": "^5.7.0"
   },
   "devDependencies": {
     "@rspack/cli": "^1.7.11",
