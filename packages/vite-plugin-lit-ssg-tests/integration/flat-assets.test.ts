@@ -4,12 +4,13 @@ import { readdirSync, existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 
 const PLAYGROUND_ROOT = resolve(import.meta.dirname, '../../../playground/page-mode')
+const CLI_PATH = resolve(import.meta.dirname, '../../vite-plugin-lit-ssg/dist/cli.cjs')
 const DIST_ROOT = join(PLAYGROUND_ROOT, 'temp', 'dist-flat-assets-test')
 const DIST_ASSETS = join(DIST_ROOT, 'assets')
 
 describe('flat asset output', () => {
   beforeAll(() => {
-    execSync('pnpm vite-lit-ssg build --config vite.config.flat-assets-test.ts', { cwd: PLAYGROUND_ROOT, stdio: 'pipe' })
+    execSync(`${JSON.stringify(process.execPath)} ${JSON.stringify(CLI_PATH)} build --config vite.config.flat-assets-test.ts`, { cwd: PLAYGROUND_ROOT, stdio: 'pipe' })
   }, 120_000)
 
   it('assets directory exists', () => {
