@@ -5,14 +5,18 @@
   "description": "pnpm monorepo for vite-plugin-lit-ssg",
   "scripts": {
     "build": "pnpm --filter vite-plugin-lit-ssg build",
+    "changeset": "changeset",
     "dev": "pnpm --filter vite-plugin-lit-ssg dev",
+    "release": "pnpm --filter vite-plugin-lit-ssg build && changeset publish",
     "typecheck": "pnpm --filter vite-plugin-lit-ssg typecheck",
     "test": "pnpm --filter vite-plugin-lit-ssg-tests test",
     "test:watch": "pnpm --filter vite-plugin-lit-ssg-tests test:watch",
+    "version-packages": "changeset version",
     "playground:build": "pnpm --filter playground build",
     "playground:preview": "pnpm --filter playground preview"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.7",
     "@types/node": "^22.0.0",
     "jiti": "^2.6.1",
     "typescript": "^5.7.0",
