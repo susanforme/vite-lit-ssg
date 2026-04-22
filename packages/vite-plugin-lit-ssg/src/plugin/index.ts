@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname, join, resolve, relative, isAbsolute } from 'node:path'
 import MagicString from 'magic-string'
@@ -122,29 +123,59 @@ function getHydrationImporterPackage(importer: string | undefined): 'lit' | 'lit
 
 function resolveHydrationDependency(id: string, importer: string | undefined): string | undefined {
   const importerPackage = getHydrationImporterPackage(importer)
-  if (!importerPackage) return undefined
+  if (!importerPackage || !importer) return undefined
+
+  const resolvePackageSubpathFromImporter = (packageName: string, subpath: string): string | undefined => {
+    try {
+      const resolvedEntry = createRequire(importer).resolve(packageName)
+      let currentDir = dirname(resolvedEntry)
+
+      while (true) {
+        const packageJsonPath = join(currentDir, 'package.json')
+        if (existsSync(packageJsonPath)) {
+          const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as { name?: string }
+          if (packageJson.name === packageName) {
+            return join(currentDir, subpath)
+          }
+        }
+
+        const parentDir = dirname(currentDir)
+        if (parentDir === currentDir) break
+        currentDir = parentDir
+      }
+    } catch (_error) {
+      return undefined
+    }
+
+    return undefined
+  }
 
   if (id === 'lit-html') {
-    return resolveSiblingPackageFilePath(importerPackage, 'lit-html', 'lit-html.js')
+    return resolvePackageSubpathFromImporter('lit-html', 'lit-html.js')
+      ?? resolveSiblingPackageFilePath(importerPackage, 'lit-html', 'lit-html.js')
   }
 
   if (id.startsWith('lit-html/')) {
-    return resolveSiblingPackageFilePath(importerPackage, 'lit-html', id.slice('lit-html/'.length))
+    return resolvePackageSubpathFromImporter('lit-html', id.slice('lit-html/'.length))
+      ?? resolveSiblingPackageFilePath(importerPackage, 'lit-html', id.slice('lit-html/'.length))
   }
 
   if (importerPackage === 'lit' || importerPackage === 'lit-element') {
     const litDependencyAnchor = 'lit'
 
     if (id === '@lit/reactive-element') {
-      return resolveSiblingPackageFilePath(litDependencyAnchor, '@lit/reactive-element', 'reactive-element.js')
+      return resolvePackageSubpathFromImporter('@lit/reactive-element', 'reactive-element.js')
+        ?? resolveSiblingPackageFilePath(litDependencyAnchor, '@lit/reactive-element', 'reactive-element.js')
     }
 
     if (id.startsWith('@lit/reactive-element/')) {
-      return resolveSiblingPackageFilePath(litDependencyAnchor, '@lit/reactive-element', id.slice('@lit/reactive-element/'.length))
+      return resolvePackageSubpathFromImporter('@lit/reactive-element', id.slice('@lit/reactive-element/'.length))
+        ?? resolveSiblingPackageFilePath(litDependencyAnchor, '@lit/reactive-element', id.slice('@lit/reactive-element/'.length))
     }
 
     if (id.startsWith('lit-element/')) {
-      return resolveSiblingPackageFilePath(litDependencyAnchor, 'lit-element', id.slice('lit-element/'.length))
+      return resolvePackageSubpathFromImporter('lit-element', id.slice('lit-element/'.length))
+        ?? resolveSiblingPackageFilePath(litDependencyAnchor, 'lit-element', id.slice('lit-element/'.length))
     }
   }
 
@@ -999,7 +1030,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       }
     },
 
-    async closeBundle() {
+    async writeBundle() {
       const config = state.resolvedConfig
       if (!config) return
       if (config.build?.ssr) return
