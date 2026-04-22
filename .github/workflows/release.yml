@@ -46,6 +46,9 @@ jobs:
       - name: Run test suite
         run: pnpm test
 
+      - name: Configure npm auth
+        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" >> ~/.npmrc
+
       - name: Publish to npm
         uses: changesets/action@v1
         with:
