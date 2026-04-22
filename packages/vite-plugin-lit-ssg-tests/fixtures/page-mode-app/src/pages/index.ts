@@ -1,6 +1,6 @@
 import { LitElement, html } from 'lit'
 import { customElement } from 'lit/decorators.js'
-import { defineLitRoute } from '../../../../../vite-plugin-lit-ssg/src/browser.js'
+import { defineLitRoute } from 'vite-plugin-lit-ssg'
 
 @customElement('home-page')
 export class HomePage extends LitElement {

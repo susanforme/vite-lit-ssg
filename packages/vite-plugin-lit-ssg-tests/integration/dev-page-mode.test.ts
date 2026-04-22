@@ -74,7 +74,7 @@ describe('page-mode dev mode — SSR rendering', () => {
         'src/pages/index.ts': `
 import { LitElement, css, html } from 'lit'
 import { customElement } from 'lit/decorators.js'
-import { defineLitRoute } from '../../../../../vite-plugin-lit-ssg/src/browser.js'
+import { defineLitRoute } from 'vite-plugin-lit-ssg'
 
 @customElement('compression-page')
 export class CompressionPage extends LitElement {
