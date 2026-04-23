@@ -26,6 +26,9 @@ describe('public root API types', () => {
       mode: 'single-component',
       entry: 'src/demo-widget.ts',
       commonStyles: [{ file: 'src/styles/common.css' }],
+      client: 'visible',
+      clientRootMargin: '150px',
+      componentExport: 'hydrate',
     }
     const publicOptions: LitSSGOptions = singleOptions
 

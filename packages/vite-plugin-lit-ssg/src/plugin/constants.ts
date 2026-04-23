@@ -11,6 +11,8 @@ export const RESOLVED_VIRTUAL_DEV_PAGE_PREFIX = '\0' + VIRTUAL_DEV_PAGE_PREFIX
 
 export const VIRTUAL_SINGLE_CLIENT_ID = 'virtual:lit-ssg-single-client'
 export const RESOLVED_VIRTUAL_SINGLE_CLIENT_ID = '\0' + VIRTUAL_SINGLE_CLIENT_ID
+export const VIRTUAL_SINGLE_ISLAND_RUNTIME_ID = 'virtual:lit-ssg-single-island-runtime'
+export const RESOLVED_VIRTUAL_SINGLE_ISLAND_RUNTIME_ID = '\0' + VIRTUAL_SINGLE_ISLAND_RUNTIME_ID
 export const VIRTUAL_SINGLE_SERVER_ID = 'virtual:lit-ssg-single-server'
 export const RESOLVED_VIRTUAL_SINGLE_SERVER_ID = '\0' + VIRTUAL_SINGLE_SERVER_ID
 export const VIRTUAL_SINGLE_DEV_ID = 'virtual:lit-ssg-single-dev'
