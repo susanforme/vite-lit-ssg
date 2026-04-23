@@ -9,6 +9,8 @@
     ],
     "strict": true,
     "skipLibCheck": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "forceConsistentCasingInFileNames": true,
     "paths": {
       "vite-plugin-lit-ssg": [
