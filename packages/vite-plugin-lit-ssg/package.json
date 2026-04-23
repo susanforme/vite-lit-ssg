@@ -1,6 +1,6 @@
 {
   "name": "@cherrywind/vite-plugin-lit-ssg",
-  "version": "0.0.1-alpha.2",
+  "version": "0.0.1-alpha.3",
   "description": "Vite plugin for Lit static site generation",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -23,13 +23,17 @@
     "vite-lit-ssg": "dist/cli.cjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "*.md",
+    "LICENSE"
   ],
   "scripts": {
     "build": "rspack build --config rspack.config.mjs --env kind=node-library --env clean=true && rspack build --config rspack.config.mjs --env kind=cli && rspack build --config rspack.config.mjs --env kind=browser && tsc -p tsconfig.build.json",
     "dev": "rspack build --config rspack.config.mjs --watch",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "prepack": "node ./scripts/sync-publish-files.mjs copy",
+    "postpack": "node ./scripts/sync-publish-files.mjs cleanup"
   },
   "dependencies": {
     "@lit-labs/ssr": "^4.0.0",
