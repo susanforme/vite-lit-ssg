@@ -5,6 +5,7 @@ import {
   LIT_SOURCE_COMPRESSION_RAW_TEXT_SKIP_TAGS,
   LIT_SOURCE_COMPRESSION_SKIP_MATRIX,
   LIT_SOURCE_COMPRESSION_SUPPORT_MATRIX,
+  collectLitSourceCompressionDependencySpecifiers,
   classifyLitSourceCompressionTargets,
   createLitSourceCompressionSourceFile,
   minifyLitSourceCompressionTarget,
@@ -82,6 +83,22 @@ describe('lit source compression policy module', () => {
         'minifier-no-change',
       ],
     })
+  })
+
+  it('collects static module dependency specifiers used by source compression traversal', () => {
+    const sourceFile = createLitSourceCompressionSourceFile('demo-widget.ts', [
+      "import './demo-button'",
+      "import { helper } from '../shared/helper'",
+      "export { DemoCard } from './demo-card'",
+      'const lazy = () => import("./lazy-card")',
+      '',
+    ].join('\n'))
+
+    expect(collectLitSourceCompressionDependencySpecifiers(sourceFile)).toEqual([
+      './demo-button',
+      '../shared/helper',
+      './demo-card',
+    ])
   })
 
   it('minifies supported static css targets', async () => {

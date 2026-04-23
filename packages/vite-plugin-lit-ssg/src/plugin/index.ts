@@ -27,6 +27,7 @@ import {
   VIRTUAL_SINGLE_SERVER_ID,
 } from './constants'
 import {
+  collectLitSourceCompressionDependencySpecifiers,
   classifyLitSourceCompressionTargets,
   createLitSourceCompressionSourceFile,
   minifyLitSourceCompressionTarget,
@@ -236,6 +237,7 @@ type TargetResolution =
 interface SharedTransformState {
   resolvedConfig: ResolvedConfig | null
   commonStyles: CommonStylesOptions
+  sourceCompressionTargets: Set<string>
   transformTargets: Map<string, TransformTargetRequest[]>
 }
 
@@ -301,6 +303,7 @@ function updateResolvedPaths(state: PluginState, root: string): void {
 
 function syncPageTargets(state: PageModeState): void {
   state.pageModuleIds = new Set(state.pages.map((page) => normalizeFileId(page.filePath)))
+  state.sourceCompressionTargets.clear()
   state.transformTargets.clear()
 }
 
@@ -321,6 +324,10 @@ function shouldHandleModule(id: string): boolean {
   if (id.includes('/node_modules/')) return false
   if (id.endsWith('.d.ts')) return false
   return /\.(ts|tsx|js|jsx)$/.test(id)
+}
+
+function shouldQueueSourceCompressionDependency(moduleSpecifier: string): boolean {
+  return moduleSpecifier.startsWith('.') || moduleSpecifier.startsWith('/')
 }
 
 function createSourceFile(fileName: string, source: string): ts.SourceFile {
@@ -851,6 +858,25 @@ async function queueExternalTarget(
   enqueueTransformTarget(targetMap, resolvedId, { kind: 'export-name', name: exportName })
 }
 
+async function queueSourceCompressionDependencies(
+  context: { resolve: (source: string, importer?: string, options?: { skipSelf?: boolean }) => Promise<{ id: string } | null> },
+  targetSet: Set<string>,
+  sourceFile: ts.SourceFile,
+  importerId: string,
+): Promise<void> {
+  const moduleSpecifiers = collectLitSourceCompressionDependencySpecifiers(sourceFile)
+
+  for (const moduleSpecifier of moduleSpecifiers) {
+    if (!shouldQueueSourceCompressionDependency(moduleSpecifier)) continue
+
+    const resolved = await context.resolve(moduleSpecifier, importerId, { skipSelf: true })
+    const resolvedId = resolved?.id ? normalizeFileId(resolved.id) : null
+    if (!resolvedId || resolvedId === importerId || !shouldHandleModule(resolvedId)) continue
+
+    targetSet.add(resolvedId)
+  }
+}
+
 async function applyTargetResolution(
   context: { resolve: (source: string, importer?: string, options?: { skipSelf?: boolean }) => Promise<{ id: string } | null> },
   targetMap: Map<string, TransformTargetRequest[]>,
@@ -904,15 +930,16 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
   let state: PluginState
 
   if (options.mode === 'single-component') {
-    state = {
-      kind: 'single-component',
-      resolved: resolveSingleComponentOptions(options),
-      resolvedConfig: null,
-      entryModuleId: null,
-      commonStyles: options.commonStyles ?? [],
-      transformTargets: new Map(),
-    }
-  } else {
+      state = {
+        kind: 'single-component',
+        resolved: resolveSingleComponentOptions(options),
+        resolvedConfig: null,
+        entryModuleId: null,
+        commonStyles: options.commonStyles ?? [],
+        sourceCompressionTargets: new Set(),
+        transformTargets: new Map(),
+      }
+    } else {
     const pagesDir = options.pagesDir ?? 'src/pages'
     state = {
       kind: 'page',
@@ -921,13 +948,14 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
         ? { pagesDir, ignore: options.ignore }
         : { pagesDir },
       resolvedConfig: null,
-      pages: [],
-      pageModuleIds: new Set(),
-      injectPolyfill: options.injectPolyfill ?? true,
-      commonStyles: options.commonStyles ?? [],
-      transformTargets: new Map(),
+        pages: [],
+        pageModuleIds: new Set(),
+        injectPolyfill: options.injectPolyfill ?? true,
+        commonStyles: options.commonStyles ?? [],
+        sourceCompressionTargets: new Set(),
+        transformTargets: new Map(),
+      }
     }
-  }
 
   const plugin: PluginWithState = {
     name: PLUGIN_NAME,
@@ -957,6 +985,7 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
 
     configResolved(config) {
       state.resolvedConfig = config
+      state.sourceCompressionTargets.clear()
       updateResolvedPaths(state, config.root ?? process.cwd())
     },
 
@@ -1273,12 +1302,15 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       const queuedTargets = state.transformTargets.get(cleanId) ?? []
       const isPageModule = state.kind === 'page' && state.pageModuleIds.has(cleanId)
       const isSingleEntry = state.kind === 'single-component' && state.entryModuleId === cleanId
+      const isSourceCompressionTarget = state.kind === 'single-component'
+        && state.sourceCompressionTargets.has(cleanId)
 
       const shouldApplyCommonStyles = commonStyleImports.length > 0
         && !code.includes(`const ${COMMON_STYLES_IDENTIFIER} =`)
         && (isPageModule || isSingleEntry || queuedTargets.length > 0)
       const shouldApplySourceCompression = state.kind === 'page'
         || isSingleEntry
+        || isSourceCompressionTarget
         || queuedTargets.length > 0
 
       if (!shouldApplyCommonStyles && !shouldApplySourceCompression) {
@@ -1288,9 +1320,13 @@ export function litSSG(options: LitSSGOptionsNew = {}): Plugin {
       let transformedCode = code
       let commonStylesResult: ReturnType<typeof rewriteModuleWithCommonStyles> | null = null
       let compressionRewrites: LitSourceCompressionRewrite[] = []
+      const sourceFile = createSourceFile(cleanId, transformedCode)
+
+      if (state.kind === 'single-component' && (isSingleEntry || isSourceCompressionTarget)) {
+        await queueSourceCompressionDependencies(this, state.sourceCompressionTargets, sourceFile, cleanId)
+      }
 
       if (shouldApplyCommonStyles) {
-        const sourceFile = createSourceFile(cleanId, transformedCode)
         const localTargets = new Set<string>()
 
         if (shouldApplySourceCompression) {

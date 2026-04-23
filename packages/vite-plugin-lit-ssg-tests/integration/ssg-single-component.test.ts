@@ -111,8 +111,12 @@ describe('single-component SSG integration', () => {
     const combined = bundleContents.join('\n')
     expect(combined).toContain('chartreuse')
     expect(combined).toMatch(/:host\{(?:display:block;font-family:sans-serif|font-family:sans-serif;display:block)\}p\{(?:color:blue|color:#00f)\}/)
+    expect(combined).toContain('background:linear-gradient(45deg,#ff6ec4,#7873f5)')
+    expect(combined).toContain('<button @click=${this.handleClick}>button</button>')
     expect(combined).not.toContain('font-family: sans-serif;')
     expect(combined).not.toContain('p { color: blue; }')
+    expect(combined).not.toContain('background: linear-gradient(45deg, #ff6ec4, #7873f5);')
+    expect(combined).not.toContain('<div>\n      <p>Hello from single-component mode</p>\n      <demo-button message="Hello from parent"></demo-button>\n    </div>')
   })
 })
 
