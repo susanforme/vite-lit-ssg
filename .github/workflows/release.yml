@@ -42,7 +42,7 @@ jobs:
       - name: Publish to npm
         uses: changesets/action@v1
         with:
-          publish: NODE_AUTH_TOKEN="" pnpm release
+          publish: pnpm release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ""
