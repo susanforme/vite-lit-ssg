@@ -2,9 +2,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { createServer } from 'vite'
 import { resolve } from 'node:path'
 import type { AddressInfo } from 'node:net'
-import { litSSG } from '../../vite-plugin-lit-ssg/src/plugin/index.js'
+import { litSSG as litSSGPackaged } from 'vite-plugin-lit-ssg'
+import { litSSG as litSSGSource } from '../../vite-plugin-lit-ssg/src/plugin/index.js'
 
-const FIXTURE_ROOT = resolve(import.meta.dirname, '../fixtures/single-component-app')
+const FIXTURE_ROOT = resolve(import.meta.dirname, '../../../playground/single-component-app')
 
 describe('single-component dev mode — HTML shell (base=/)', () => {
   let server: Awaited<ReturnType<typeof createServer>>
@@ -13,8 +14,9 @@ describe('single-component dev mode — HTML shell (base=/)', () => {
   beforeAll(async () => {
     server = await createServer({
       root: FIXTURE_ROOT,
+      configFile: false,
       base: '/',
-      plugins: [litSSG({
+      plugins: [litSSGSource({
         mode: 'single-component',
         entry: 'src/demo-widget.ts',
         commonStyles: [{ file: 'src/common.css' }],
@@ -33,22 +35,28 @@ describe('single-component dev mode — HTML shell (base=/)', () => {
 
   it('serves full HTML shell at /', async () => {
     const res = await fetch(`http://localhost:${port}/`)
-    expect(res.status).toBe(200)
     const html = await res.text()
+    expect(res.status).toBe(200)
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('<html')
     expect(html).toContain('<body')
     expect(html).toContain('virtual:lit-ssg-single-client')
+    expect(html).toContain('virtual:lit-ssg-single-island-runtime')
     expect(html).toContain('shadowrootmode')
     expect(html).toContain('Hello from single-component mode')
+    expect(html).toContain('<script type="module" src="/@id/__x00__virtual:lit-ssg-single-island-runtime"></script>')
+    expect(html.indexOf('virtual:lit-ssg-single-island-runtime')).toBeLessThan(html.indexOf('<lit-ssg-island'))
+    expect(html).toContain('<lit-ssg-island ssr client="load" component-export="hydrate" component-url="/@id/__x00__virtual:lit-ssg-single-client">')
     expect(html).toContain('<demo-app-root')
     expect(html).toContain('</demo-app-root>')
   })
 
-  it('HTML shell contains module script tag for dev virtual entry', async () => {
+  it('HTML shell stores the dev virtual entry on the island instead of a direct hydration script tag', async () => {
     const res = await fetch(`http://localhost:${port}/`)
     const html = await res.text()
-    expect(html).toContain('type="module"')
+    expect(html).toContain('component-url="/@id/__x00__virtual:lit-ssg-single-client"')
+    expect(html).not.toMatch(/<script type="module" src="[^"]*virtual:lit-ssg-single-client"/)
+    expect(html).toMatch(/<script type="module" src="[^"]*virtual:lit-ssg-single-island-runtime"/)
   })
 
   it('serves transformed entry module with minified supported templates and preserved commonStyles markers', async () => {
@@ -73,8 +81,9 @@ describe('single-component dev mode — HTML shell (base=/demo/)', () => {
   beforeAll(async () => {
     server = await createServer({
       root: FIXTURE_ROOT,
+      configFile: false,
       base: '/demo/',
-      plugins: [litSSG({
+      plugins: [litSSGSource({
         mode: 'single-component',
         entry: 'src/demo-widget.ts',
         commonStyles: [{ file: 'src/common.css' }],
@@ -97,12 +106,50 @@ describe('single-component dev mode — HTML shell (base=/demo/)', () => {
     const html = await res.text()
     expect(html).toContain('<!DOCTYPE html>')
     expect(html).toContain('virtual:lit-ssg-single-client')
+    expect(html).toContain('virtual:lit-ssg-single-island-runtime')
     expect(html).toContain('shadowrootmode')
+    expect(html).toContain('<lit-ssg-island')
   })
 
   it('asset URLs include /demo/ prefix when base=/demo/', async () => {
     const res = await fetch(`http://localhost:${port}/demo/`)
     const html = await res.text()
     expect(html).toContain('/demo/')
+  })
+})
+
+describe('single-component dev mode — packaged plugin smoke test', () => {
+  let server: Awaited<ReturnType<typeof createServer>>
+  let port: number
+
+  beforeAll(async () => {
+    server = await createServer({
+      root: FIXTURE_ROOT,
+      configFile: false,
+      base: '/',
+      plugins: [litSSGPackaged({
+        mode: 'single-component',
+        entry: 'src/demo-widget.ts',
+        commonStyles: [{ file: 'src/common.css' }],
+        wrapperTag: 'demo-app-root',
+      })],
+      server: { port: 0 },
+      logLevel: 'silent',
+    })
+    await server.listen()
+    port = (server.httpServer!.address() as AddressInfo).port
+  }, 30_000)
+
+  afterAll(async () => {
+    await Promise.race([server.close(), new Promise(r => setTimeout(r, 5000))])
+  }, 15_000)
+
+  it('serves / successfully when imported through package exports', async () => {
+    const res = await fetch(`http://localhost:${port}/`)
+    const html = await res.text()
+    expect(res.status).toBe(200)
+    expect(html).toContain('<lit-ssg-island')
+    expect(html).toContain('Hello from single-component mode')
+    expect(html).toContain('component-url="/@id/__x00__virtual:lit-ssg-single-client"')
   })
 })

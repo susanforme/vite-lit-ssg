@@ -8,7 +8,7 @@ import { readManifest, resolveAssetsFromManifest } from '../assets/manifest'
 import { renderPage } from '../runtime/render-page'
 import { renderComponent } from '../runtime/render-component'
 import { resolveRouteFilePath, routeDepth, writeRoute } from '../output/write-route'
-import { VIRTUAL_SINGLE_CLIENT_ID, VIRTUAL_SINGLE_SERVER_ID } from '../plugin/constants'
+import { VIRTUAL_SINGLE_CLIENT_ID, VIRTUAL_SINGLE_ISLAND_RUNTIME_ID, VIRTUAL_SINGLE_SERVER_ID } from '../plugin/constants'
 import type { BuildContext, PageInputResult } from './build'
 
 const SERVER_BUILD_PARENT = '.vite-ssg'
@@ -141,11 +141,13 @@ export async function runSingleSSRRender(
     console.log('[vite-lit-ssg] Reading manifest...')
     const manifest = await readManifest(resolvedOutDir)
     const assets = resolveAssetsFromManifest(manifest, base, 0, VIRTUAL_SINGLE_CLIENT_ID)
+    const islandRuntime = resolveAssetsFromManifest(manifest, base, 0, VIRTUAL_SINGLE_ISLAND_RUNTIME_ID)
 
     const html = await renderComponent(renderResult, opts.wrapperTag, assets, {
       preload: opts.preload,
       injectPolyfill: opts.injectPolyfill,
       dsdPendingStyle: opts.dsdPendingStyle,
+      islandRuntimeSrc: islandRuntime.js,
     })
 
     const filePath = resolveRouteFilePath('/', resolvedOutDir)

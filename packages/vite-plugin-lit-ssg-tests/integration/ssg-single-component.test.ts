@@ -4,10 +4,10 @@ import { readFile, rm, readdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { existsSync } from 'node:fs'
 
-const FIXTURE_ROOT = resolve(import.meta.dirname, '../fixtures/single-component-app')
+const FIXTURE_ROOT = resolve(import.meta.dirname, '../../../playground/single-component-app')
 const CLI_PATH = resolve(import.meta.dirname, '../../vite-plugin-lit-ssg/dist/cli.cjs')
 
-const DIST_INHERIT = join(FIXTURE_ROOT, 'temp', 'dist-test-inherit')
+const DIST_INHERIT = join(FIXTURE_ROOT, 'dist')
 
 function runFixtureBuild(configFile: string): void {
   execSync(`${JSON.stringify(process.execPath)} ${JSON.stringify(CLI_PATH)} build --config ${configFile}`, {
@@ -33,22 +33,32 @@ describe('single-component SSG integration', () => {
 
   it('index.html contains wrapper tag', async () => {
     const content = await readFile(join(DIST_INHERIT, 'index.html'), 'utf-8')
+    expect(content).toContain('<lit-ssg-island ssr client="load" component-export="hydrate"')
     expect(content).toContain('<demo-app-root>')
     expect(content).toContain('</demo-app-root>')
   })
 
-  it('index.html is fully contained in wrapper — script inside wrapper', async () => {
+  it('index.html emits island definition before the first island and keeps the inner wrapper inside the island', async () => {
     const content = await readFile(join(DIST_INHERIT, 'index.html'), 'utf-8')
-    expect(content.trim()).toMatch(/^<demo-app-root>[\s\S]*<\/demo-app-root>$/)
-    const scriptIdx = content.indexOf('<script type="module"')
+    const runtimeScriptIdx = content.indexOf('<script type="module" src="')
+    expect(runtimeScriptIdx).toBeGreaterThan(-1)
+    expect(runtimeScriptIdx).toBeLessThan(content.indexOf('<lit-ssg-island'))
+    const islandIdx = content.indexOf('<lit-ssg-island')
+    const wrapperIdx = content.indexOf('<demo-app-root>')
     const closingIdx = content.indexOf('</demo-app-root>')
-    expect(scriptIdx).toBeGreaterThan(-1)
-    expect(closingIdx).toBeGreaterThan(scriptIdx)
+    expect(islandIdx).toBeGreaterThan(-1)
+    expect(wrapperIdx).toBeGreaterThan(islandIdx)
+    expect(closingIdx).toBeGreaterThan(wrapperIdx)
   })
 
-  it('index.html contains client hydration script', async () => {
+  it('index.html stores the client hydration entry on the island instead of a direct script tag', async () => {
     const content = await readFile(join(DIST_INHERIT, 'index.html'), 'utf-8')
-    expect(content).toContain('<script type="module" src=')
+    expect(content).toMatch(/component-url="(?:\.\/|\/)assets\//)
+    const scriptTags = content.match(/<script type="module" src="[^"]+"><\/script>/g) ?? []
+    expect(scriptTags.length).toBe(1)
+    const runtimeSrc = scriptTags[0]!.match(/src="([^"]+)"/)?.[1] ?? ''
+    const componentUrl = content.match(/component-url="([^"]+)"/)?.[1] ?? ''
+    expect(runtimeSrc).not.toBe(componentUrl)
   })
 
   it('index.html contains component DSD markup', async () => {
@@ -111,8 +121,12 @@ describe('single-component SSG integration', () => {
     const combined = bundleContents.join('\n')
     expect(combined).toContain('chartreuse')
     expect(combined).toMatch(/:host\{(?:display:block;font-family:sans-serif|font-family:sans-serif;display:block)\}p\{(?:color:blue|color:#00f)\}/)
+    expect(combined).toContain('background:linear-gradient(45deg,#ff6ec4,#7873f5)')
+    expect(combined).toContain('<button @click=${this.handleClick}>button</button>')
     expect(combined).not.toContain('font-family: sans-serif;')
     expect(combined).not.toContain('p { color: blue; }')
+    expect(combined).not.toContain('background: linear-gradient(45deg, #ff6ec4, #7873f5);')
+    expect(combined).not.toContain('<div>\n      <p>Hello from single-component mode</p>\n      <demo-button message="Hello from parent"></demo-button>\n    </div>')
   })
 })
 
@@ -136,11 +150,13 @@ describe('named export integration', () => {
 
   it('index.html is fully contained in wrapper for named export', async () => {
     const content = await readFile(join(DIST_NAMED, 'index.html'), 'utf-8')
-    expect(content.trim()).toMatch(/^<demo-named-root>[\s\S]*<\/demo-named-root>$/)
-    const scriptIdx = content.indexOf('<script type="module"')
+    expect(content).toContain('<lit-ssg-island ssr client="load" component-export="hydrate"')
+    const islandIdx = content.indexOf('<lit-ssg-island')
+    const wrapperIdx = content.indexOf('<demo-named-root>')
     const closingIdx = content.indexOf('</demo-named-root>')
-    expect(scriptIdx).toBeGreaterThan(-1)
-    expect(closingIdx).toBeGreaterThan(scriptIdx)
+    expect(islandIdx).toBeGreaterThan(-1)
+    expect(wrapperIdx).toBeGreaterThan(islandIdx)
+    expect(closingIdx).toBeGreaterThan(wrapperIdx)
   })
 
   it('generates DSD markup for named export component', async () => {
@@ -171,9 +187,11 @@ describe('preload=none integration', () => {
     expect(existsSync(join(DIST_NONE, 'index.html'))).toBe(true)
   })
 
-  it('index.html contains client hydration script', async () => {
+  it('index.html stores the hydration entry on the island', async () => {
     const content = await readFile(join(DIST_NONE, 'index.html'), 'utf-8')
-    expect(content).toContain('<script type="module" src=')
+    expect(content).toContain('component-url="/assets/')
+    const scriptTags = content.match(/<script type="module" src="[^"]+"><\/script>/g) ?? []
+    expect(scriptTags.length).toBe(1)
   })
 
   it('index.html has no modulepreload links', async () => {
@@ -220,9 +238,11 @@ describe('preload=entry-only integration', () => {
     expect(existsSync(join(DIST_ENTRY_ONLY, 'index.html'))).toBe(true)
   })
 
-  it('index.html contains client hydration script', async () => {
+  it('index.html stores the hydration entry on the island', async () => {
     const content = await readFile(join(DIST_ENTRY_ONLY, 'index.html'), 'utf-8')
-    expect(content).toContain('<script type="module" src=')
+    expect(content).toContain('component-url="/assets/')
+    const scriptTags = content.match(/<script type="module" src="[^"]+"><\/script>/g) ?? []
+    expect(scriptTags.length).toBe(1)
   })
 
   it('index.html has no modulepreload links', async () => {

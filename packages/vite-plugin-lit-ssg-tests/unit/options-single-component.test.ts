@@ -27,6 +27,15 @@ describe('resolveSingleComponentOptions', () => {
     expect(resolved.preload).toBe('inherit')
   })
 
+  it('applies default client strategy and component export', () => {
+    const resolved = resolveSingleComponentOptions({
+      mode: 'single-component',
+      entry: 'src/components/my-element.ts',
+    })
+    expect(resolved.client).toBe('load')
+    expect(resolved.componentExport).toBe('hydrate')
+  })
+
   it('preserves commonStyles when provided', () => {
     const resolved = resolveSingleComponentOptions({
       mode: 'single-component',
@@ -81,6 +90,39 @@ describe('resolveSingleComponentOptions', () => {
       preload: 'entry-only',
     })
     expect(resolved.preload).toBe('entry-only')
+  })
+
+  it('preserves explicit client strategy fields', () => {
+    const resolved = resolveSingleComponentOptions({
+      mode: 'single-component',
+      entry: 'src/components/my-element.ts',
+      client: 'visible',
+      clientRootMargin: '200px',
+      componentExport: 'customHydrate',
+    })
+    expect(resolved.client).toBe('visible')
+    expect(resolved.clientRootMargin).toBe('200px')
+    expect(resolved.componentExport).toBe('customHydrate')
+  })
+
+  it('preserves explicit media and idle client options', () => {
+    const mediaResolved = resolveSingleComponentOptions({
+      mode: 'single-component',
+      entry: 'src/components/my-element.ts',
+      client: 'media',
+      clientMedia: '(min-width: 768px)',
+    })
+    expect(mediaResolved.client).toBe('media')
+    expect(mediaResolved.clientMedia).toBe('(min-width: 768px)')
+
+    const idleResolved = resolveSingleComponentOptions({
+      mode: 'single-component',
+      entry: 'src/components/my-element.ts',
+      client: 'idle',
+      clientIdleTimeout: 1500,
+    })
+    expect(idleResolved.client).toBe('idle')
+    expect(idleResolved.clientIdleTimeout).toBe(1500)
   })
 
   it('applies default injectPolyfill (false)', () => {

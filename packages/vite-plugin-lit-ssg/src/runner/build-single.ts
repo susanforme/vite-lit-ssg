@@ -1,7 +1,7 @@
 import { resolve } from 'node:path'
 import { build } from 'vite'
 import type { ResolvedSingleComponentOptions } from '../types'
-import { _ssgActive, VIRTUAL_SINGLE_CLIENT_ID } from '../plugin/constants'
+import { _ssgActive, VIRTUAL_SINGLE_CLIENT_ID, VIRTUAL_SINGLE_ISLAND_RUNTIME_ID } from '../plugin/constants'
 import { runSingleSSRRender } from './ssr-render'
 import type { BuildContext } from './build'
 
@@ -33,6 +33,7 @@ export async function runSingleSSG(
         rollupOptions: {
           input: {
             'lit-ssg-single': VIRTUAL_SINGLE_CLIENT_ID,
+            'lit-ssg-single-island-runtime': VIRTUAL_SINGLE_ISLAND_RUNTIME_ID,
           },
         },
       },

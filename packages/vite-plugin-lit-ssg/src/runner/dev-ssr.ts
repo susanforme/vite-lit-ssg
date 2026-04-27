@@ -1,7 +1,13 @@
 import type { ViteDevServer } from 'vite'
 import { VIRTUAL_SERVER_ID, VIRTUAL_SINGLE_SERVER_ID } from '../plugin/constants'
+import type { SingleComponentIslandMetadata } from '../types'
+import {
+  buildSingleComponentIslandAttrs,
+  buildSingleComponentIslandRuntimeScriptTag,
+  SINGLE_COMPONENT_ISLAND_TAG,
+} from '../runtime/single-island'
 
-interface DevServerMod {
+interface PageDevServerMod {
   renderToHtml: (url: string, ctx: { route: string; params: Record<string, string> }) => Promise<string | null>
   getPageMeta?: (url: string) => {
     title?: string
@@ -13,14 +19,29 @@ interface DevServerMod {
   } | null
 }
 
-async function loadDevMod(server: ViteDevServer, virtualId: string): Promise<DevServerMod> {
+interface SingleDevServerMod {
+  renderToHtml: (url: string, ctx: { route: string; params: Record<string, string> }) => Promise<string | null>
+  render: (url: string, ctx: { route: string; params: Record<string, string> }) => Promise<{ island?: SingleComponentIslandMetadata }>
+}
+
+async function loadDevPageMod(server: ViteDevServer, virtualId: string): Promise<PageDevServerMod> {
   const mod = await server.ssrLoadModule(virtualId, { fixStacktrace: false })
   if (typeof mod['renderToHtml'] !== 'function') {
     throw new Error(
       `[vite-plugin-lit-ssg] Dev SSR entry "${virtualId}" must export a \`renderToHtml\` function`,
     )
   }
-  return mod as DevServerMod
+  return mod as PageDevServerMod
+}
+
+async function loadDevSingleMod(server: ViteDevServer): Promise<SingleDevServerMod> {
+  const mod = await server.ssrLoadModule(VIRTUAL_SINGLE_SERVER_ID, { fixStacktrace: false })
+  if (typeof mod['renderToHtml'] !== 'function' || typeof mod['render'] !== 'function') {
+    throw new Error(
+      `[vite-plugin-lit-ssg] Dev SSR entry "${VIRTUAL_SINGLE_SERVER_ID}" must export both \`render\` and \`renderToHtml\` functions`,
+    )
+  }
+  return mod as SingleDevServerMod
 }
 
 export async function renderDevPage(
@@ -29,7 +50,7 @@ export async function renderDevPage(
   devScriptSrc: string,
   injectPolyfill: boolean,
 ): Promise<string> {
-  const devMod = await loadDevMod(server, VIRTUAL_SERVER_ID)
+  const devMod = await loadDevPageMod(server, VIRTUAL_SERVER_ID)
   const [appHtml, rawMeta] = await Promise.all([
     devMod.renderToHtml(route, { route, params: {} }),
     devMod.getPageMeta ? devMod.getPageMeta(route) : null,
@@ -91,36 +112,41 @@ export async function renderDevSingleComponent(
   server: ViteDevServer,
   wrapperTag: string,
   devScriptSrc: string,
+  islandRuntimeSrc: string,
   injectPolyfill: boolean,
   dsdPendingStyle: boolean,
 ): Promise<string> {
-  const devMod = await loadDevMod(server, VIRTUAL_SINGLE_SERVER_ID)
-  const appHtml = await devMod.renderToHtml('/', { route: '/', params: {} })
+  const devMod = await loadDevSingleMod(server)
+  const [appHtml, result] = await Promise.all([
+    devMod.renderToHtml('/', { route: '/', params: {} }),
+    devMod.render('/', { route: '/', params: {} }),
+  ])
 
   if (appHtml === null || appHtml === undefined) {
     throw new Error('[vite-plugin-lit-ssg] single-component SSR dev render returned null — component may not be registered')
   }
 
-  const scriptTag = `<script type="module" src="${devScriptSrc}"></script>`
-
-  const innerContent = `${appHtml}\n${scriptTag}`
+  const islandRuntimeScript = buildSingleComponentIslandRuntimeScriptTag(islandRuntimeSrc)
+  const island = result?.island ?? { client: 'load', componentExport: 'hydrate' }
+  const islandAttrs = buildSingleComponentIslandAttrs(island, devScriptSrc, injectPolyfill && dsdPendingStyle)
+  const wrapperHtml = `<${wrapperTag}>${appHtml}</${wrapperTag}>`
+  const islandHtml = `<${SINGLE_COMPONENT_ISLAND_TAG} ${islandAttrs}>${wrapperHtml}</${SINGLE_COMPONENT_ISLAND_TAG}>`
 
   if (!injectPolyfill) {
-    return `<${wrapperTag}>${innerContent}</${wrapperTag}>`
+    return [islandRuntimeScript, islandHtml].join('\n')
   }
 
   const dsdStyle = dsdPendingStyle
-    ? `<style>${wrapperTag}[dsd-pending]{display:none}</style>`
+    ? `<style>${SINGLE_COMPONENT_ISLAND_TAG}[dsd-pending]{display:none}</style>`
     : ''
 
-  const wrapperOpenTag = dsdPendingStyle ? `<${wrapperTag} dsd-pending>` : `<${wrapperTag}>`
-
   const { buildDsdPolyfillScriptsForWrapper } = await import('../runtime/dsd-polyfill')
-  const polyfillScripts = await buildDsdPolyfillScriptsForWrapper(wrapperTag, dsdPendingStyle)
+  const polyfillScripts = await buildDsdPolyfillScriptsForWrapper(SINGLE_COMPONENT_ISLAND_TAG, dsdPendingStyle)
 
   return [
+    islandRuntimeScript,
     dsdStyle,
-    `${wrapperOpenTag}${innerContent}</${wrapperTag}>`,
+    islandHtml,
     polyfillScripts,
   ].filter(Boolean).join('\n')
 }

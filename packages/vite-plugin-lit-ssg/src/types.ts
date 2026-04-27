@@ -63,6 +63,7 @@ export interface PageDescriptor {
   head?: string[]
   htmlAttrs?: Record<string, string>
   bodyAttrs?: Record<string, string>
+  island?: SingleComponentIslandMetadata
 }
 
 /**
@@ -114,6 +115,16 @@ export type { IgnoreOption }
 
 export type PreloadPolicy = 'inherit' | 'none' | 'entry-only'
 
+export type SingleComponentClientStrategy = 'load' | 'idle' | 'visible' | 'media'
+
+export interface SingleComponentIslandMetadata {
+  client: SingleComponentClientStrategy
+  componentExport: string
+  clientMedia?: string
+  clientRootMargin?: string
+  clientIdleTimeout?: number
+}
+
 export interface CommonStyleEntry {
   /** Path to a shared stylesheet relative to project root, e.g. 'src/styles/common.scss'. */
   file: string
@@ -142,18 +153,28 @@ export interface SingleComponentOptions {
   commonStyles?: CommonStylesOptions
   /** Named export to use. Defaults to 'default'. */
   exportName?: string
-  /** Custom element tag to use as the wrapper. Can be a string or a zero-argument function returning a string. Defaults to 'lit-ssg-root'. */
+  /** Custom element tag to use as the inner wrapper inside the framework-owned lit-ssg-island element. Can be a string or a zero-argument function returning a string. Defaults to 'lit-ssg-root'. */
   wrapperTag?: string | (() => string)
+  /** Hydration strategy owned by the lit-ssg-island runtime. Defaults to 'load'. */
+  client?: SingleComponentClientStrategy
+  /** Export name to invoke from the generated hydration entry. Defaults to 'hydrate'. */
+  componentExport?: string
+  /** Media query used when client='media'. */
+  clientMedia?: string
+  /** IntersectionObserver rootMargin used when client='visible'. */
+  clientRootMargin?: string
+  /** requestIdleCallback timeout used when client='idle'. */
+  clientIdleTimeout?: number
   /** Preload strategy. Defaults to 'inherit'. */
   preload?: PreloadPolicy
   /**
    * Whether to inject the Declarative Shadow DOM polyfill scripts into the output.
-   * Defaults to `false`. When `true`, polyfill scripts are appended after the wrapper tag.
+   * Defaults to `false`. When `true`, polyfill scripts are appended after the island wrapper.
    */
   injectPolyfill?: boolean
   /**
-   * Whether to inject a `<style>wrapper-tag[dsd-pending]{display:none}</style>` rule and
-   * add the `dsd-pending` attribute to the wrapper element.
+   * Whether to inject a `<style>lit-ssg-island[dsd-pending]{display:none}</style>` rule and
+   * add the `dsd-pending` attribute to the outer island element.
    * Only effective when `injectPolyfill` is `true`. Defaults to `true` when injectPolyfill is true.
    */
   dsdPendingStyle?: boolean
@@ -168,6 +189,11 @@ export interface ResolvedSingleComponentOptions {
   commonStyles?: CommonStylesOptions
   exportName: string
   wrapperTag: string | (() => string)
+  client: SingleComponentClientStrategy
+  componentExport: string
+  clientMedia?: string
+  clientRootMargin?: string
+  clientIdleTimeout?: number
   preload: PreloadPolicy
   injectPolyfill: boolean
   dsdPendingStyle: boolean
@@ -181,6 +207,11 @@ export function resolveSingleComponentOptions(opts: SingleComponentOptions): Res
     ...(opts.commonStyles ? { commonStyles: opts.commonStyles } : {}),
     exportName: opts.exportName ?? 'default',
     wrapperTag: opts.wrapperTag ?? 'lit-ssg-root',
+    client: opts.client ?? 'load',
+    componentExport: opts.componentExport ?? 'hydrate',
+    ...(opts.clientMedia ? { clientMedia: opts.clientMedia } : {}),
+    ...(opts.clientRootMargin ? { clientRootMargin: opts.clientRootMargin } : {}),
+    ...(opts.clientIdleTimeout !== undefined ? { clientIdleTimeout: opts.clientIdleTimeout } : {}),
     preload: opts.preload ?? 'inherit',
     injectPolyfill,
     dsdPendingStyle: opts.dsdPendingStyle ?? injectPolyfill,

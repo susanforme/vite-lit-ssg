@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit'
 import { customElement } from 'lit/decorators.js'
 import { defineLitRoute } from 'vite-plugin-lit-ssg/browser'
+import '../components/demo-button'
 
 @customElement('home-page')
 export class HomePage extends LitElement {
@@ -44,6 +45,7 @@ export class HomePage extends LitElement {
       <h1>Welcome to vite-plugin-lit-ssg</h1>
       <p>This page was statically generated using Lit SSR and Vite.</p>
       <p>It supports LitElement with Shadow DOM, server-side rendering, and client-side hydration.</p>
+      <demo-button message="Hello from parent"></demo-button>
       <button @click=${this.handleClick}>Click me</button>
     `
   }

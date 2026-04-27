@@ -74,6 +74,20 @@ export interface LitSourceCompressionClassification {
   unchangedTargets: LitSourceCompressionUnchangedTarget[]
 }
 
+export function collectLitSourceCompressionDependencySpecifiers(sourceFile: ts.SourceFile): string[] {
+  const specifiers = new Set<string>()
+
+  for (const statement of sourceFile.statements) {
+    if ((ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement))
+      && statement.moduleSpecifier
+      && ts.isStringLiteral(statement.moduleSpecifier)) {
+      specifiers.add(statement.moduleSpecifier.text)
+    }
+  }
+
+  return [...specifiers]
+}
+
 interface LitSourceCompressionReplacementContext {
   className: string
   memberKind: 'getter' | 'method' | 'property'

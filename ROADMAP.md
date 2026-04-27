@@ -1,3 +1,5 @@
+https://developer.mozilla.org/en-US/blog/mdn-front-end-deep-dive/
+
 这个项目现在已经有了 Lit 页面扫描、SSG 输出、元信息注入、single-component 模式、dev watcher 这些基础能力，但还明显停在“能用的核心版”。下一步最值得做的，不是再堆小功能，而是把它做成一个更完整的 Lit 静态站点方案。
 先说结论：最值得做的功能
 1. 动态路由：支持 [slug]、[...all] 这类参数路由。README 里明确还不支持，RenderContext.params 也已经有类型了，但现在始终是空对象。
